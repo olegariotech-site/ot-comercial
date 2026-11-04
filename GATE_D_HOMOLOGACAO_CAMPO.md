@@ -39,3 +39,17 @@ GitHub Actions: https://github.com/olegariotech-site/ot-comercial/actions/runs/4
 - A produção V1.2 permanece no `main` (commit `f33d3329`); PR #5 segue rascunho, sem merge ou deploy.
 
 **Gate para publicação: bloqueado** até ambiente de homologação isolado, testes Android/iOS e aprovação expressa de Alexandre.
+
+
+## Atualização — homologação Supabase real (04/11/2026)
+
+**Projeto de teste criado com custo cotado em US$ 0/mês:** `ot-comercial-homologacao`, `efscgxwvaixwqhffwdqu`, região `sa-east-1` na organização Free atual.
+
+- Migração aplicada: `ot_comercial_staging_inicial_20261104`.
+- Verificação SQL de staging: **13/13 condições aprovadas**, com 3 tabelas RLS, 12 políticas CRM, 3 políticas Storage, bucket privado de 6 MB, FK composta e zero registros.
+- HTTP de staging real, somente chave publishable: três tabelas retornaram **HTTP 401** a requisições não autenticadas, sem mutação de dados.
+- Preview seguro construído com `tests/staging/build-preview.mjs`: **aponta exclusivamente ao staging**, mostra selo de ambiente fictício e foi enviado a artefato GitHub Actions. **Não é um link público/site publicado.**
+- `tests/staging/qa-live-api.mjs` já preparado para autenticação real, isolamento entre duas contas, envio de foto e limpeza por UUID; **ainda não executado**, pois faltam duas contas Auth de teste legítimas.
+- Contas devem ser criadas no Dashboard do projeto de staging; seguir `tests/staging/CRIAR_USUARIOS_TESTE.md`. Não copiar credenciais da produção nem usar escrita direta no schema `auth`.
+- Última verificação de projetos: produção com registros preservados, staging vazio.
+- A autorização dada foi para seguir na homologação, **não** para atualizar `main` ou colocar dados reais no modo offline.
