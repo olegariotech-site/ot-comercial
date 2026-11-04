@@ -18,6 +18,13 @@ document.getElementById('whats').href='https://wa.me/?text='+encodeURIComponent(
 async function copy(){try{await navigator.clipboard.writeText(info.url);document.getElementById('status').textContent='Link copiado!';}catch{window.prompt('Copie o endereço:',info.url);}}
 document.getElementById('copy').addEventListener('click',copy);
 document.getElementById('png').addEventListener('click',async()=>{try{await OTCardExport.save(cardData);document.getElementById('status').textContent='Card gerado para download.'}catch(e){document.getElementById('status').textContent='Falha ao gerar imagem: '+e.message}});
-document.getElementById('shareImg').addEventListener('click',async()=>{try{const r=await OTCardExport.share(cardData);if(r==='downloaded')document.getElementById('status').textContent='Compartilhamento indisponível: imagem baixada.'}catch(e){document.getElementById('status').textContent='Falha ao compartilhar: '+e.message}});
+// Preparar a imagem antes do clique para preservar o gesto no Web Share (Android/iOS).
+const imageShareButton=document.getElementById('shareImg');imageShareButton.disabled=true;imageShareButton.textContent='Preparando imagem...';
+let readyCard=null;
+OTCardExport.create(cardData).then(file=>{readyCard=file;imageShareButton.disabled=false;imageShareButton.textContent='Compartilhar imagem'}).catch(e=>{imageShareButton.textContent='Imagem indisponível';document.getElementById('status').textContent='Falha ao preparar a imagem: '+e.message});
+imageShareButton.addEventListener('click',()=>{
+ if(!readyCard)return;
+ OTCardExport.shareReady(readyCard,cardData).then(result=>{if(result==='downloaded')document.getElementById('status').textContent='Compartilhamento indisponível: imagem baixada.'}).catch(e=>{document.getElementById('status').textContent='Falha ao compartilhar: '+e.message});
+});
 document.getElementById('share').addEventListener('click',async()=>{if(navigator.share){try{await navigator.share(info);return}catch(e){if(e.name==='AbortError')return}}await copy()});
 </script></body></html>
