@@ -7,7 +7,7 @@ const PREFIX='ot-comercial-shell-';
 const CACHE=PREFIX+'v1-5-gate-b';
 const PATHS=[
  './','./index.html','./style.css','./app.js','./config.js','./ot-logo.js',
- './offline-vault.js','./offline-status.js','./manifest.webmanifest',
+ './offline-vault.js','./field-sync.js','./offline-status.js','./manifest.webmanifest',
  './apresentacao-ot.html','./apresentacao-servico.css','./card-export.js',
  './solucoes/landing.html','./solucoes/site.html','./solucoes/cardapio.html',
  './solucoes/google.html','./solucoes/catalogo.html','./solucoes/marca.html',
