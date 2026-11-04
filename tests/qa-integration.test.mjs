@@ -21,7 +21,7 @@ test('Versão integrada preserva o CRM Premium e registra apenas shell público'
  assert.match(store,/AES-GCM/);
  assert.match(store,/PBKDF2/);
  assert.match(app,/OTOfflineVault\./);
- assert.match(workflow,/cp sw\.js offline-vault\.js offline-status\.js manifest\.webmanifest ot-icon\.svg _site\//);
+ assert.match(workflow,/cp sw\.js offline-vault\.js field-sync\.js offline-status\.js manifest\.webmanifest ot-icon\.svg _site\//);
  assert.match(workflow,/branches:\s*\[main\]/,'Nenhum deploy automático a partir desta branch');
  assert.equal(manifest.scope,'./');
  assert.equal(manifest.display,'standalone');
