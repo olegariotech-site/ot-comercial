@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b1120"><meta name="robots" content="noindex,follow">
+<title>Diagnóstico Digital | OLEGARIO TECH</title><meta name="description" content="Entenda o que a presença digital do seu comércio já faz bem e o que pode melhorar.">
+<meta property="og:type" content="website"><meta property="og:site_name" content="OLEGARIO TECH"><meta property="og:title" content="Diagnóstico Digital | OLEGARIO TECH"><meta property="og:description" content="Entenda o que a presença digital do seu comércio já faz bem e o que pode melhorar."><meta property="og:url" content="https://olegariotech-site.github.io/ot-comercial/solucoes/diagnostico.html">
+<meta name="twitter:card" content="summary"><meta name="twitter:title" content="Diagnóstico Digital | OLEGARIO TECH"><meta name="twitter:description" content="Entenda o que a presença digital do seu comércio já faz bem e o que pode melhorar.">
+<link rel="canonical" href="https://olegariotech-site.github.io/ot-comercial/solucoes/diagnostico.html"><link rel="stylesheet" href="../apresentacao-servico.css"></head>
+<body><div class="wrap"><nav><div class="logo-group"><img id="brandSymbol" alt="Símbolo oficial da Olegario Tech"><strong>OLEGARIO TECH</strong></div><a href="../apresentacao-ot.html">Todas as soluções ↗</a></nav>
+<main><section class="panel"><div class="eyebrow">Primeiro passo · Soluções digitais para negócios</div><h1>Diagnóstico Digital</h1><p class="lead">Entenda o que a presença digital do seu comércio já faz bem e o que pode melhorar.</p>
+<h2>Por que é importante</h2><p>Evita contratar soluções sem verificar se elas realmente são prioritárias para o negócio.</p><div class="benefit">Primeiro entender. Depois investir com critério.</div><h2>O que podemos entregar</h2><ul><li>Verificação de canais públicos existentes</li><li>Identificação de oportunidades</li><li>Recomendação consultiva inicial</li></ul><p class="price">Análise inicial gratuita, conforme disponibilidade.</p>
+<p><a href="https://olegariotech.com.br/diagnostico-digital" target="_blank" rel="noopener">Ver projeto relacionado ↗</a></p><div class="actions"><button class="btn primary" id="share" type="button">Compartilhar apresentação</button><a class="btn" id="whats" target="_blank" rel="noopener">Enviar pelo WhatsApp ↗</a><button class="btn" id="copy" type="button">Copiar link</button><button class="btn" id="png" type="button">Baixar card PNG</button><button class="btn" id="shareImg" type="button">Compartilhar imagem</button></div>
+<p class="note" id="status" role="status" aria-live="polite">Consultoria e orçamento personalizados. Resultados de busca e de vendas não são garantidos.</p></section></main><footer>OLEGARIO TECH | Soluções Digitais para Negócios</footer></div>
+<script src="../ot-logo.js"></script><script src="../card-export.js"></script><script>
+'use strict';
+document.getElementById('brandSymbol').src=window.OTBrandLogo||'';
+const cardData={"id":"diagnostico","title":"Diagnóstico Digital","tag":"Primeiro passo","intro":"Entenda o que a presença digital do seu comércio já faz bem e o que pode melhorar.","benefit":"Primeiro entender. Depois investir com critério."};
+const info={title:"OLEGARIO TECH | Diagnóstico Digital",text:"Entenda o que a presença digital do seu comércio já faz bem e o que pode melhorar.",url:"https://olegariotech-site.github.io/ot-comercial/solucoes/diagnostico.html"};
+document.getElementById('whats').href='https://wa.me/?text='+encodeURIComponent(info.title+'\n'+info.text+'\n'+info.url);
+async function copy(){try{await navigator.clipboard.writeText(info.url);document.getElementById('status').textContent='Link copiado!';}catch{window.prompt('Copie o endereço:',info.url);}}
+document.getElementById('copy').addEventListener('click',copy);
+document.getElementById('png').addEventListener('click',async()=>{try{await OTCardExport.save(cardData);document.getElementById('status').textContent='Card gerado para download.'}catch(e){document.getElementById('status').textContent='Falha ao gerar imagem: '+e.message}});
+// Preparar a imagem antes do clique para preservar o gesto no Web Share (Android/iOS).
+const imageShareButton=document.getElementById('shareImg');imageShareButton.disabled=true;imageShareButton.textContent='Preparando imagem...';
+let readyCard=null;
+OTCardExport.create(cardData).then(file=>{readyCard=file;imageShareButton.disabled=false;imageShareButton.textContent='Compartilhar imagem'}).catch(e=>{imageShareButton.textContent='Imagem indisponível';document.getElementById('status').textContent='Falha ao preparar a imagem: '+e.message});
+imageShareButton.addEventListener('click',()=>{
+ if(!readyCard)return;
+ OTCardExport.shareReady(readyCard,cardData).then(result=>{if(result==='downloaded')document.getElementById('status').textContent='Compartilhamento indisponível: imagem baixada.'}).catch(e=>{document.getElementById('status').textContent='Falha ao compartilhar: '+e.message});
+});
+document.getElementById('share').addEventListener('click',async()=>{if(navigator.share){try{await navigator.share(info);return}catch(e){if(e.name==='AbortError')return}}await copy()});
+</script></body></html>
