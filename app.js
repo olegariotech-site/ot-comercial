@@ -320,8 +320,24 @@ async function uploadPhotos(fileList){if(!active||!fileList.length)return;const 
  done++;toast(`Foto ${done} de ${selected.length} salva na nuvem.`);
  }catch(e){toast('Foto não salva: '+safeErr(e));}}
  $('photoCamera').value='';$('photoFiles').value='';try{await loadPhotos(active.id);await updateFieldState();if(staged&&!offlineMode&&navigator.onLine!==false){await syncNow();await loadPhotos(active.id);}}catch(e){toast('Galeria ou sincronização pendente: '+safeErr(e));}}
-async function downloadPhoto(id){const p=photos.find(x=>x.id===id);if(!p)return;try{const resp=await request(`object/authenticated/${bucket}/${encodePath(p.storage_path)}`,{storage:true});const blob=await resp.blob();const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=p.arquivo_nome||'foto';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);}catch(e){toast('Download falhou: '+safeErr(e));}}
-async function deletePhoto(id){const p=photos.find(x=>x.id===id);if(!p||!confirm('Excluir esta foto da nuvem permanentemente?'))return;
+async function downloadPhoto(id){
+ const p=photos.find(x=>x.id===id);if(!p)return;
+ try{
+  let blob;
+  if(p.__pending){
+   if(!fieldReady())throw Error('Desbloqueie o cofre para acessar a fotografia.');
+   blob=(await OTOfflineVault.getPhoto(id))?.blob;
+  }else{
+   if(offlineMode||navigator.onLine===false)throw Error('Esta fotografia não foi guardada no aparelho.');
+   const resp=await request('object/authenticated/'+bucket+'/'+encodePath(p.storage_path),{storage:true});
+   blob=await resp.blob();
+  }
+  if(!blob)throw Error('Imagem não disponível.');
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=p.arquivo_nome||'foto';a.click();setTimeout(()=>URL.revokeObjectURL(url),2500);
+ }catch(e){toast('Download falhou: '+safeErr(e));}
+}
+async function deletePhoto(id){const p=photos.find(x=>x.id===id);if(!p)return;if(p.__pending){toast('Esta foto ainda está pendente; sincronize antes de excluir.');return;}if(offlineMode||navigator.onLine===false){toast('Exclusão exige internet.');return;}if(!confirm('Excluir esta foto da nuvem permanentemente?'))return;
  try{await request(`object/${bucket}/${encodePath(p.storage_path)}`,{method:'DELETE',storage:true});await request(`ot_fotos?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});await loadPhotos(active.id);toast('Foto excluída.');}catch(e){toast('Exclusão incompleta: '+safeErr(e));}}
 async function deleteCompany(){if(!active||!confirm(`Excluir ${active.nome} e todo o histórico? A exclusão é definitiva.`))return;
  try{if(photos.length)throw Error('Baixe e exclua as fotos antes de remover a empresa, evitando arquivos órfãos.');await request(`ot_empresas?id=eq.${active.id}`,{method:'DELETE'});active=null;$('companyPanel').classList.add('hidden');await load();toast('Empresa removida.');}catch(e){toast('Não excluído: '+safeErr(e));}}
