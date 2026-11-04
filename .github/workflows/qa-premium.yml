@@ -60,3 +60,21 @@ jobs:
           path: artifacts/gate-d-field/*.png
           if-no-files-found: warn
           retention-days: 7
+
+  staging-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preparar preview isolado (sem deploy)
+        run: node tests/staging/build-preview.mjs
+      - name: Arquivar somente arquivos de homologação
+        uses: actions/upload-artifact@v4
+        with:
+          name: ot-v15-preview-staging-nao-publicado
+          path: artifacts/staging-preview/
+          if-no-files-found: error
+          retention-days: 7
