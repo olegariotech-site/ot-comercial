@@ -16,3 +16,6 @@ header{background:#0b1425e8;border-bottom-color:#3b5277}
 .ot-presentation:hover{border-color:#a8e3ff}
 @media(max-width:640px){.ot-heading-actions{width:100%}.ot-heading-actions .btn{width:100%}}
 @media(prefers-reduced-motion:reduce){.company-card{transition:none}.company-card:hover{transform:none}}
+
+/* Identidade OT: arquivo de logo original, sem reinterpretação */
+.brand-icon{overflow:hidden;padding:3px;background:#080808;border-color:#566b88}.brand-icon img{display:block;width:100%;height:100%;object-fit:cover;border-radius:10px}
