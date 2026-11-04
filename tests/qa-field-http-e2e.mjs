@@ -125,7 +125,12 @@ try{
  browser=await launch(false);
  await browser.until(isShown('loginView'),'login online');
  await browser.evalJS('(()=>{document.querySelector("#email").value="qa@ot.invalid";document.querySelector("#password").value="SomenteTesteOT-2026!";document.querySelector("#loginForm").requestSubmit();return true})()');
- await browser.until(isShown('appView'),'entrar na carteira');
+ try{await browser.until(isShown('appView'),'entrar na carteira');}
+ catch(e){
+  const details=await browser.evalJS('({toast:document.querySelector("#toast")?.textContent,loginHidden:document.querySelector("#loginView")?.classList.contains("hidden"),setupHidden:document.querySelector("#setupView")?.classList.contains("hidden"),state:document.querySelector("#connectionState")?.textContent,api:window.OT_CONFIG?.url})');
+  console.log('Gate D: erro de login no mock',JSON.stringify(details));
+  throw e;
+ }
  await browser.evalJS('document.querySelector("#prepareFieldBtn").click();true');
  await browser.until('document.querySelector("#vaultDialog").open','preparação do cofre');
  await browser.evalJS('(()=>{document.querySelector("#vaultPassword").value='+JSON.stringify(PWD)+';document.querySelector("#vaultForm").requestSubmit();return true})()');
