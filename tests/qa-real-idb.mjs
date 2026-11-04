@@ -92,7 +92,7 @@ function runPhase(stage){
  if(r.error)throw r.error;
  assert.equal(r.status,0,'Chrome falhou em '+stage+': '+(r.stderr||'').slice(-900));
  const pass=/<html[^>]+data-e2e="passed"/.test(r.stdout);
- assert.ok(pass,'Falha real no Chrome ('+stage+'): '+(r.stdout.match(/OT E2E FAILED:[^<]*/)||['nenhuma conclusão']).join(''));
+ assert.ok(pass,'Falha real no Chrome ('+stage+'): '+(r.stdout.match(/<html[^>]*data-e2e=[^>]*>/)||['sem marcador']).join('')+' | '+r.stdout.slice(-550));
  console.log('OT E2E Chromium localhost: '+stage+' passou.');
 }
 try{
