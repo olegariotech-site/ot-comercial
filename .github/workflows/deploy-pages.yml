@@ -28,7 +28,7 @@ jobs:
           mkdir -p _site
           cp index.html app.js style.css config.js robots.txt apresentacao-ot.html apresentacao-servico.css card-export.js ot-logo.js _site/
           cp -R solucoes _site/
-          cp sw.js offline-store.js offline-status.js manifest.webmanifest ot-icon.svg _site/
+          cp sw.js offline-vault.js offline-status.js manifest.webmanifest ot-icon.svg _site/
           test -s _site/index.html
           test -s _site/app.js
           test -s _site/config.js
@@ -37,7 +37,7 @@ jobs:
           test -s _site/card-export.js
           test -s _site/ot-logo.js
           test -s _site/sw.js
-          test -s _site/offline-store.js
+          test -s _site/offline-vault.js
           test -s _site/manifest.webmanifest
           test -s _site/ot-icon.svg
       - name: Configurar GitHub Pages
