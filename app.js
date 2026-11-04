@@ -197,12 +197,25 @@ function render(){const term=convertRaw($('search').value.trim());const status=$
 function openForm(c=null){const form=$('companyForm');form.reset();form.dataset.id=c?.id||'';$('dialogTitle').textContent=c?'Editar ficha':'Nova empresa';if(c)for(const field of fields){const el=form.elements.namedItem(field);if(el)el.value=c[field]??'';}$('companyDialog').showModal();}
 function formData(){const d={};for(const k of fields){const val=$('companyForm').elements.namedItem(k).value.trim();d[k]=k==='retorno_em'?(val||null):val;}return d;}
 async function saveCompany(ev){ev.preventDefault();const btn=ev.submitter;btn.disabled=true;
- try{const data=formData();if(!data.nome||!data.briefing)throw Error('Informe o nome e o pedido do cliente.');
- const id=$('companyForm').dataset.id;
- const p=id?`ot_empresas?id=eq.${encodeURIComponent(id)}`:'ot_empresas';
- const [record]=await request(p,{method:id?'PATCH':'POST',body:data});
- $('companyDialog').close();await load();toast('Ficha salva na nuvem.');if(record)await openCompany(record.id);
- }catch(e){toast('Não salvou: '+safeErr(e));}finally{btn.disabled=false;}}
+ try{
+  const data=formData(),id=$('companyForm').dataset.id;
+  if(!data.nome||!data.briefing)throw Error('Informe nome e pedido.');
+  if(id&&(offlineMode||navigator.onLine===false))throw Error('Edição de ficha existente requer internet.');
+  if(!id&&fieldReady()){
+   const r=await OTOfflineVault.stage('company',{id:crypto.randomUUID(),...data});
+   $('companyDialog').close();companies.unshift({id:r.id,...data});render();
+   await updateFieldState();toast('Ficha criptografada no aparelho. Envio pendente.');
+   await openCompany(r.id);
+   if(!offlineMode&&navigator.onLine!==false)await syncNow();
+   return;
+  }
+  if(offlineMode||navigator.onLine===false)throw Error('Desbloqueie o cofre antes de usar sem internet.');
+  const p=id?'ot_empresas?id=eq.'+encodeURIComponent(id):'ot_empresas';
+  const [record]=await request(p,{method:id?'PATCH':'POST',body:data});
+  $('companyDialog').close();await load();toast('Ficha salva na nuvem.');
+  if(record)await openCompany(record.id);
+ }catch(e){toast('Não salvou: '+safeErr(e));}finally{btn.disabled=false;}
+}
 async function openCompany(id){active=companies.find(c=>c.id===id);if(!active)return;
  $('companyPanel').classList.remove('hidden');$('panelTitle').textContent=active.nome;
  $('panelInfo').textContent=`${active.bairro||'Bairro não informado'} · ${active.endereco||'Endereço não informado'} · ${active.responsavel||'Responsável não informado'} · ${active.whatsapp||'Sem WhatsApp'} · ${active.status}`;
