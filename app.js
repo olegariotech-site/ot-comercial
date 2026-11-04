@@ -346,9 +346,12 @@ async function deleteCompany(){
  if(offlineMode||navigator.onLine===false){toast('Exclusão exige conexão com a nuvem.');return;}
  if(fieldReady()){
   const pending=await OTOfflineVault.pending();
-  if(pending.some(p=>p.payload.id===active.id||
-   p.payload.record?.empresa_id===active.id||
-   (p.kind==='photo'||p.kind==='visit')&&p.payload.id&&!companies.some(x=>x.id===p.payload.id))){
+  const related=await Promise.all(pending.map(async p=>{
+   if(p.kind==='company')return p.payload.id===active.id;
+   const item=await OTOfflineVault.get(p.kind,p.payload.id);
+   return item?.empresa_id===active.id;
+  }));
+  if(related.some(Boolean)){
    toast('Há registros do campo pendentes. Sincronize antes de excluir esta empresa.');return;
   }
  }
