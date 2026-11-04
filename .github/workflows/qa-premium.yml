@@ -29,6 +29,8 @@ jobs:
         run: node tests/qa-vault.mjs
       - name: Verificar IndexedDB real após fechar e reabrir Chrome
         run: node tests/qa-real-idb.mjs
+      - name: Gate D — Fluxo completo campo offline e sincronização HTTPS mock
+        run: node tests/qa-field-http-e2e.mjs
       - name: Renderizar 8 cards e vitrine com Chrome real
         run: node tests/qa-visual.mjs
       - name: Guardar capturas para auditoria manual
@@ -36,6 +38,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ot-v14-qa-visual
-          path: artifacts/v1-4-visual/*.png
+          path: |
+            artifacts/v1-4-visual/*.png
+            artifacts/gate-d-field/*.png
           if-no-files-found: warn
           retention-days: 7
