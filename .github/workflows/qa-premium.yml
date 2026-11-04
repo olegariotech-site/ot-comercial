@@ -6,6 +6,10 @@ on:
   push:
     branches: [feat/v1-4-vitrine-premium]
 
+concurrency:
+  group: ot-premium-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
