@@ -13,10 +13,10 @@
 - `verify.sql`: inspeções somente leitura de RLS, bucket, relações e confirmação de banco vazio.
 
 ## Execução segura
-1. Confirmar com Alexandre a organização **e** obter cotação oficial de R$ 0. Não criar projeto se houver custo.
-2. Criar projeto separado, nunca uma branch paga ou compartilhando dados com produção.
-3. Aplicar o schema no projeto de homologação APENAS, usando migração controlada.
-4. Conferir as verificações com `verify.sql` e assessoria de segurança do Supabase.
+1. CONFIRMADO: organização aprovada por Alexandre, cotação oficial US$ 0/mês, segundo projeto criado em São Paulo.
+2. CONCLUÍDO: staging `efscgxwvaixwqhffwdqu`, `ot-comercial-homologacao` (Supabase Free); projeto de produção isolado.
+3. CONCLUÍDO: esquema aplicado por migração somente ao staging (três tabelas vazias, 12 políticas RLS, bucket privado e políticas Storage).
+4. CONCLUÍDO: `verify.sql` validado, sem dados, e Security Advisor sem alertas na consulta inicial.
 5. Criar uma conta de teste nova. Não reutilizar o acesso real da OT nem guardar senhas no repositório ou GitHub Actions.
 6. Configurar credenciais públicas de *staging* em preview isolado, sem mudar o site `main` do GitHub Pages.
 7. Validar registro/visita/foto: 3 pendências offline → zero após confirmação da API, sem duplicação.
@@ -31,3 +31,13 @@
 - PR #5 é *draft*. `main` permanece a V1.2 em produção.
 
 **Não copiar usuários, senhas, fotos, dados de clientes nem Storage da produção.**
+
+## Estado confirmado após execução
+- **Staging:** https://supabase.com/dashboard/project/efscgxwvaixwqhffwdqu
+- **API staging:** https://efscgxwvaixwqhffwdqu.supabase.co
+- **Organização:** `jmvzceepqgdosghqgiad` (Free); cotação de criação US$ 0/mês.
+- **Migração aplicada no staging:** `ot_comercial_staging_inicial_20261104`.
+- **Banco vazio** após migração: nenhuma empresa, visita, foto ou usuário de produção importado.
+- **Permissões:** anon sem leitura nas 3 tabelas, role authenticated autorizada sob RLS por owner.
+- **Pendente:** usuários de testes separados via Auth, preview HTTPS isolado para Android/iOS e fluxo HTTP real ponta a ponta.
+- **Institucionalização OT:** adicionar `olegariotech.oficial@gmail.com` como administradora via convites da organização após homologação, sem remover o acesso do proprietário antes de conferir os privilégios.
