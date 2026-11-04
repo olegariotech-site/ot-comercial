@@ -13,12 +13,12 @@
 - Manifest PWA e ícone SVG com os bytes WebP da arte oficial da OT.
 - Service Worker para cache somente dos recursos públicos da interface e apresentações; nunca dados do Supabase.
 - Aviso explícito de modo sem internet, sem prometer salvamento offline.
-- Módulo IndexedDB experimental carregado, mas SEM ligação aos formulários, e ainda não criptografado.
+- Cofre IndexedDB criptografado com AES-GCM/PBKDF2 carregado, mas ainda SEM ligação aos formulários. O módulo legado sem criptografia foi retirado.
 - Testes automáticos de escopo e isolamento do Service Worker.
 - Nenhuma alteração no banco, RLS, Storage, produção ou serviços pagos.
 
 ## Bloqueios antes de utilizar sem sinal
-1. Cofre local criptografado, segregado por usuário e protegido por desbloqueio.
+1. Cofre local criptografado, segregado por usuário e protegido por desbloqueio (código desenvolvido, validação em andamento).
 2. Autorização de acesso offline após primeiro login online.
 3. Cadastro, visita e foto com persistência local confirmada antes da mensagem de sucesso.
 4. IDs estáveis e sincronização idempotente após retorno de conexão, com contador de pendências.
@@ -35,3 +35,9 @@ Somente main publica GitHub Pages; PR permanece em draft até homologação e au
 
 ## Próximo gate B
 Implementar cofre local criptografado e fila com IDs estáveis, executar testes com dados fictícios, só depois integrar aos formulários.
+
+## Atualização Gate B — cripto local
+- Novo módulo offline-vault.js: senha local derivada via PBKDF2 (310.000 iterações SHA-256), AES-GCM com IV aleatório e AAD por registro, cripto de imagem e operações em transações IndexedDB.
+- Chaves e senha não são gravadas em disco; desbloqueio exige senha de pelo menos 12 caracteres.
+- O módulo não é integrado aos formulários do CRM nem cria sessões offline por conta própria.
+- Antes de abrir para clientes reais: homologar UI, persistência com navegador fechado, política de recuperação, upload idempotente e segurança do dispositivo.
