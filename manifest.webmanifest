@@ -1,0 +1,18 @@
+{
+  "name": "OT Comercial | Olegario Tech",
+  "short_name": "OT Comercial",
+  "description": "CRM e apresentação comercial da Olegario Tech.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1120",
+  "theme_color": "#0b1120",
+  "icons": [
+    {
+      "src": "./ot-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
