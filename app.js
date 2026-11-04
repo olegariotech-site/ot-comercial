@@ -240,12 +240,32 @@ async function loadVisits(id){
   (v.retorno_em?' · '+fmtDate(v.retorno_em):'')+'</small></article>').join('')||
   '<div class="empty">Nenhuma visita registrada ainda.</div>';
 }
-async function saveVisit(ev){ev.preventDefault();if(!active)return;const btn=ev.submitter;btn.disabled=true;
- try{const nota=$('visitNote').value.trim();if(!nota)throw Error('Descreva a conversa.');const retorno=$('visitReturn').value||null;
- await request('ot_visitas',{method:'POST',body:{empresa_id:active.id,nota,proximo_passo:$('visitNext').value.trim(),retorno_em:retorno}});
- if(retorno){await request(`ot_empresas?id=eq.${active.id}`,{method:'PATCH',body:{retorno_em:retorno}});active.retorno_em=retorno;}
- $('visitForm').reset();await loadVisits(active.id);render();toast('Visita e próximo passo salvos.');
- }catch(e){toast('Atenção: '+safeErr(e)+' Confira o histórico antes de repetir.');}finally{btn.disabled=false;}}
+async function saveVisit(ev){ev.preventDefault();if(!active)return;
+ const btn=ev.submitter;btn.disabled=true;
+ try{
+  const nota=$('visitNote').value.trim(),retorno=$('visitReturn').value||null,
+   proximo=$('visitNext').value.trim(),companyId=active.id;
+  if(!nota)throw Error('Descreva a conversa.');
+  if(fieldReady()){
+   await OTOfflineVault.stage('visit',{id:crypto.randomUUID(),empresa_id:companyId,
+    nota,proximo_passo:proximo,retorno_em:retorno,realizado_em:new Date().toISOString()});
+   if(retorno)active.retorno_em=retorno;
+   $('visitForm').reset();await loadVisits(companyId);render();await updateFieldState();
+   toast('Visita salva no aparelho. Aguardando confirmação da nuvem.');
+   if(!offlineMode&&navigator.onLine!==false)await syncNow();
+   return;
+  }
+  if(offlineMode||navigator.onLine===false)throw Error('Cofre offline bloqueado.');
+  await request('ot_visitas',{method:'POST',body:{empresa_id:companyId,nota,proximo_passo:proximo,retorno_em:retorno}});
+  if(retorno){
+   await request('ot_empresas?id=eq.'+encodeURIComponent(companyId),{
+    method:'PATCH',body:{retorno_em:retorno}
+   });active.retorno_em=retorno;
+  }
+  $('visitForm').reset();await loadVisits(companyId);render();toast('Visita salva na nuvem.');
+ }catch(e){toast('Atenção: '+safeErr(e)+' Confira pendências antes de repetir.');}
+ finally{btn.disabled=false;}
+}
 async function loadPhotos(id){destroyObjectUrls();photos=await request(`ot_fotos?select=*&empresa_id=eq.${encodeURIComponent(id)}&order=created_at.desc`);renderPhotoCards();
  for(const photo of photos){if(active?.id!==id)break;try{const resp=await request(`object/authenticated/${bucket}/${encodePath(photo.storage_path)}`,{storage:true});const blob=await resp.blob();const url=URL.createObjectURL(blob);objectUrls.push(url);const im=document.getElementById('img-'+photo.id);if(im)im.src=url;}catch{ /* restrição/falha isolada: não oferece imagem publicamente */ }} }
 function renderPhotoCards(){$('photoList').innerHTML=photos.map(p=>`<article class="photo-card"><img id="img-${esc(p.id)}" alt="${esc(p.categoria)} — ${esc(p.arquivo_nome)}" loading="lazy"><div class="photo-body"><strong>${esc(p.arquivo_nome)}</strong><p>${esc(p.categoria)}${p.publicacao_autorizada?' · uso autorizado':' · uso não autorizado'}</p><div class="photo-actions"><button class="btn secondary" data-download="${esc(p.id)}">↓ Baixar</button><button class="btn danger" data-delete-photo="${esc(p.id)}">Excluir</button></div></div></article>`).join('')||'<div class="empty">Ainda não há fotos. Use a câmera ou selecione imagens.</div>';}
