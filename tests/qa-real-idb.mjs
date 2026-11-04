@@ -96,7 +96,7 @@ async function runPhase(stage){
  try{
   const debugFile=path.join(profile,'DevToolsActivePort');
   let portNum=0;
-  for(let i=0;i<70;i++){
+  for(let i=0;i<200;i++){
    if(fs.existsSync(debugFile)){
     const v=Number(fs.readFileSync(debugFile,'utf8').split('\n')[0]);
     if(v>0){portNum=v;break}
