@@ -33,3 +33,11 @@ header{background:#0b1425e8;border-bottom-color:#3b5277}
   padding:3px 9px;line-height:1.3}
  header #logoutBtn{grid-area:logout;align-self:center;padding:8px 12px}
 }
+
+/* OT V1.5 — aviso de conectividade: informativo; sem simular salvamento. */
+.offline-notice{max-width:1280px;margin:15px auto 0;padding:12px 18px;
+ color:#ffdfb4;background:#392619;border:1px solid #906038;
+ border-radius:13px;font-size:13px;line-height:1.55}
+.offline-notice[hidden]{display:none!important}
+.offline-notice strong{color:#ffeccf}
+@media(max-width:640px){.offline-notice{margin:8px 13px 0;padding:11px 13px;font-size:12px}}
