@@ -27,7 +27,9 @@ window.OTFieldSync=(()=>{
   throw Error('Tipo inválido');
  }
  function matches(kind,remote,local){
-  const keys=kind==='company'?['id','nome','briefing']:kind==='visit'?['id','empresa_id','nota']:['id','empresa_id','storage_path','bytes'];
+  const keys=kind==='company'?['id','nome','segmento','bairro','cidade','endereco','responsavel','whatsapp','presenca_digital','briefing','observacoes','status','retorno_em']:
+   kind==='visit'?['id','empresa_id','nota','proximo_passo','retorno_em']:
+   ['id','empresa_id','storage_path','arquivo_nome','categoria','descricao','bytes','publicacao_autorizada'];
   return keys.every(key=>String(remote[key]??'')===String(local[key]??''));
  }
  function extension(mime){return {'image/jpeg':'jpg','image/png':'png','image/webp':'webp'}[mime]}
