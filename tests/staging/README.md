@@ -41,3 +41,14 @@
 - **Permissões:** anon sem leitura nas 3 tabelas, role authenticated autorizada sob RLS por owner.
 - **Pendente:** usuários de testes separados via Auth, preview HTTPS isolado para Android/iOS e fluxo HTTP real ponta a ponta.
 - **Institucionalização OT:** adicionar `olegariotech.oficial@gmail.com` como administradora via convites da organização após homologação, sem remover o acesso do proprietário antes de conferir os privilégios.
+
+## Teste REST real preparado, ainda NÃO executado
+- Script: `tests/staging/qa-live-api.mjs`.
+- Exige uma conta de testes **criada somente no projeto de homologação** e duas variáveis de ambiente com e-mail/senha de testes, sem inserir segredos no repositório.
+- Usa chave `sb_publishable_` do staging, jamais service_role/secret.
+- Só permite URL fixa do staging `efscgxwvaixwqhffwdqu`, impedindo uso acidental do projeto real.
+- Fluxo: autenticar → criar empresa/visita/foto fictícios → verificar API, Storage e RLS → tentar duplicação → solicitar exclusão pelos UUIDs usados neste teste.
+- Opcional: segunda conta fictícia para comprovar isolamento cruzado (recomendado antes da homologação).
+- A conta de testes pode ser criada no painel Supabase Auth > Users. **Não colar senha nesta conversa ou no GitHub**.
+- A sintaxe do script é verificada pela CI; a execução real aguarda usuário de teste e validação do ambiente.
+- **Ainda não existe URL pública de preview para Android.** Não utilizar o CRM produtivo para testes offline.
