@@ -160,6 +160,7 @@ async function syncNow(){
    offlineMode=false;show('appView');
   }
   await authenticated();
+  $('connectionState').textContent='Nuvem conectada';
   const summary=await window.OTFieldSync.sync({vault:window.OTOfflineVault,api:cloudApi(userId),
    owner:userId,online:()=>navigator.onLine!==false});
   if(summary.failed){
@@ -225,8 +226,9 @@ async function openCompany(id){active=companies.find(c=>c.id===id);if(!active)re
 async function loadVisits(id){
  let remote=[];
  if(!offlineMode&&navigator.onLine!==false){
-  remote=await request('ot_visitas?select=*&empresa_id=eq.'+encodeURIComponent(id)+'&order=realizado_em.desc&limit=50');
-  if(fieldReady())await OTOfflineVault.snapshot('visit',remote);
+  try{remote=await request('ot_visitas?select=*&empresa_id=eq.'+encodeURIComponent(id)+'&order=realizado_em.desc&limit=50');
+   if(fieldReady())await OTOfflineVault.snapshot('visit',remote);
+  }catch(e){if(!fieldReady())throw e;toast('Histórico na nuvem indisponível; mostrando cópia protegida.');}
  }
  const local=fieldReady()?(await OTOfflineVault.list('visit')).filter(v=>v.empresa_id===id):[];
  const merged=new Map(remote.map(row=>[row.id,row]));
@@ -339,7 +341,18 @@ async function downloadPhoto(id){
 }
 async function deletePhoto(id){const p=photos.find(x=>x.id===id);if(!p)return;if(p.__pending){toast('Esta foto ainda está pendente; sincronize antes de excluir.');return;}if(offlineMode||navigator.onLine===false){toast('Exclusão exige internet.');return;}if(!confirm('Excluir esta foto da nuvem permanentemente?'))return;
  try{await request(`object/${bucket}/${encodePath(p.storage_path)}`,{method:'DELETE',storage:true});await request(`ot_fotos?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});await loadPhotos(active.id);toast('Foto excluída.');}catch(e){toast('Exclusão incompleta: '+safeErr(e));}}
-async function deleteCompany(){if(!active||!confirm(`Excluir ${active.nome} e todo o histórico? A exclusão é definitiva.`))return;
+async function deleteCompany(){
+ if(!active)return;
+ if(offlineMode||navigator.onLine===false){toast('Exclusão exige conexão com a nuvem.');return;}
+ if(fieldReady()){
+  const pending=await OTOfflineVault.pending();
+  if(pending.some(p=>p.payload.id===active.id||
+   p.payload.record?.empresa_id===active.id||
+   (p.kind==='photo'||p.kind==='visit')&&p.payload.id&&!companies.some(x=>x.id===p.payload.id))){
+   toast('Há registros do campo pendentes. Sincronize antes de excluir esta empresa.');return;
+  }
+ }
+ if(!confirm('Excluir '+active.nome+' e todo o histórico? A exclusão é definitiva.'))return;
  try{if(photos.length)throw Error('Baixe e exclua as fotos antes de remover a empresa, evitando arquivos órfãos.');await request(`ot_empresas?id=eq.${active.id}`,{method:'DELETE'});active=null;$('companyPanel').classList.add('hidden');await load();toast('Empresa removida.');}catch(e){toast('Não excluído: '+safeErr(e));}}
 function exportCsv(){const columns=['nome','segmento','bairro','cidade','endereco','responsavel','whatsapp','presenca_digital','briefing','observacoes','status','retorno_em','created_at'];
  const clean=v=>{const s=String(v??'');return '"'+(/^[\s]*[=+@\-\t\r]/.test(s)?"'":'')+s.replace(/"/g,'""')+'"';};
