@@ -2,6 +2,7 @@
  * Não chama servidores externos, não contém credenciais, não acessa dados reais.
  */
 import http from 'node:http';
+import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
 const USER='11111111-1111-4111-8111-111111111111';
@@ -12,15 +13,16 @@ const type={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=u
 const json=(res,status,obj)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(obj))};
 const fail=(res,status,msg)=>json(res,status,{message:msg});
 const body=async(req,limit=8*1024*1024)=>{let bytes=0;const parts=[];for await(const x of req){bytes+=x.length;if(bytes>limit)throw Error('Exceeds test size limit');parts.push(x)}return Buffer.concat(parts)};
-export function startMockSupabase(root){
+export function startMockSupabase(root,tls=null){
  const map={ot_empresas:new Map(),ot_visitas:new Map(),ot_fotos:new Map()},media=new Map(),calls=[];
- const server=http.createServer(async(req,res)=>{
+ const scheme=tls?'https':'http';
+ const server=(tls?https:http).createServer(tls||{},async(req,res)=>{
   const url=new URL(req.url,'http://127.0.0.1');
   const pathname=decodeURIComponent(url.pathname);
   try{
    if(pathname==='/config.js'){
     res.writeHead(200,{'Content-Type':'text/javascript','Cache-Control':'no-store'});
-    res.end('window.OT_CONFIG={url:"http://127.0.0.1:'+server.address().port+'",publishableKey:"sb_publishable_QA_MOCK_NOT_REAL"};');
+    res.end('window.OT_CONFIG={url:"'+scheme+'://127.0.0.1:'+server.address().port+'",publishableKey:"sb_publishable_QA_MOCK_NOT_REAL"};');
     return;
    }
    if(pathname==='/auth/v1/token'){
@@ -91,7 +93,7 @@ export function startMockSupabase(root){
   }catch(e){fail(res,500,'Erro no teste: '+e.message)}
  });
  return new Promise(resolve=>server.listen(0,'127.0.0.1',()=>resolve({
-  server,origin:'http://127.0.0.1:'+server.address().port,map,media,calls,user:USER,
+  server,origin:scheme+'://127.0.0.1:'+server.address().port,map,media,calls,user:USER,
   close:()=>new Promise(r=>server.close(r))
  })));
 }
