@@ -222,8 +222,24 @@ async function openCompany(id){active=companies.find(c=>c.id===id);if(!active)re
  $('panelBriefing').textContent=active.briefing||'Sem briefing';$('panelNotes').textContent=active.observacoes||'Sem observações';
  $('visitForm').reset();$('photoConsent').checked=false;
  await Promise.all([loadVisits(id),loadPhotos(id)]);$('companyPanel').scrollIntoView({behavior:'smooth',block:'start'});}
-async function loadVisits(id){const list=await request(`ot_visitas?select=*&empresa_id=eq.${encodeURIComponent(id)}&order=realizado_em.desc&limit=50`);
- $('visitList').innerHTML=list.map(v=>`<article><small>${new Date(v.realizado_em).toLocaleString('pt-BR')}</small><p class="note-text">${esc(v.nota)}</p><small>${esc(v.proximo_passo||'Sem próximo passo')}${v.retorno_em?' · '+fmtDate(v.retorno_em):''}</small></article>`).join('')||'<div class="empty">Nenhuma visita registrada ainda.</div>';}
+async function loadVisits(id){
+ let remote=[];
+ if(!offlineMode&&navigator.onLine!==false){
+  remote=await request('ot_visitas?select=*&empresa_id=eq.'+encodeURIComponent(id)+'&order=realizado_em.desc&limit=50');
+  if(fieldReady())await OTOfflineVault.snapshot('visit',remote);
+ }
+ const local=fieldReady()?(await OTOfflineVault.list('visit')).filter(v=>v.empresa_id===id):[];
+ const merged=new Map(remote.map(row=>[row.id,row]));
+ for(const visit of local)if(!merged.has(visit.id))merged.set(visit.id,visit);
+ const pending=new Set(fieldReady()?(await OTOfflineVault.pending()).filter(x=>x.kind==='visit').map(x=>x.payload.id):[]);
+ const list=[...merged.values()].sort((a,b)=>String(b.realizado_em||'').localeCompare(String(a.realizado_em||'')));
+ $('visitList').innerHTML=list.map(v=>'<article><small>'+
+  esc(v.realizado_em?new Date(v.realizado_em).toLocaleString('pt-BR'):'Sem data')+
+  (pending.has(v.id)?' · Salvo no aparelho':'')+'</small><p class="note-text">'+esc(v.nota)+
+  '</p><small>'+esc(v.proximo_passo||'Sem próximo passo')+
+  (v.retorno_em?' · '+fmtDate(v.retorno_em):'')+'</small></article>').join('')||
+  '<div class="empty">Nenhuma visita registrada ainda.</div>';
+}
 async function saveVisit(ev){ev.preventDefault();if(!active)return;const btn=ev.submitter;btn.disabled=true;
  try{const nota=$('visitNote').value.trim();if(!nota)throw Error('Descreva a conversa.');const retorno=$('visitReturn').value||null;
  await request('ot_visitas',{method:'POST',body:{empresa_id:active.id,nota,proximo_passo:$('visitNext').value.trim(),retorno_em:retorno}});
