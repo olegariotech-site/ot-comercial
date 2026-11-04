@@ -89,9 +89,10 @@ async function launch(offline=false){
   });
   await send('Page.navigate',{url:mock.origin+'/index.html'});
   async function evalJS(js){
-   const r=await send('Runtime.evaluate',{
-    expression:js,returnByValue:true,awaitPromise:true,userGesture:true
-   });
+   const r=await Promise.race([
+    send('Runtime.evaluate',{expression:js,returnByValue:true,awaitPromise:true,userGesture:true}),
+    wait(6500).then(()=>{throw Error('Avaliação no Chrome excedeu 6,5 segundos')})
+   ]);
    if(r.exceptionDetails)throw Error('Erro JS da interface: '+(r.exceptionDetails.text||'')+' '+JSON.stringify(r.exceptionDetails.exception?.description||'').slice(0,450));
    return r.result?.value;
   }
@@ -138,7 +139,7 @@ try{
  await browser.until('document.querySelector("#vaultDialog").open','preparação do cofre');
  await browser.evalJS('(()=>{document.querySelector("#vaultPassword").value='+JSON.stringify(PWD)+';document.querySelector("#vaultForm button[type=submit]").click();return true})()');
  await browser.until('document.querySelector("#fieldState").textContent.includes("desbloqueado")','cofre preparado',25000);
- await browser.until('(async()=>{if(!("serviceWorker" in navigator))return false;const r=await navigator.serviceWorker.ready;return !!r.active})()','service worker instalado',20000);
+ await browser.until('(async()=>{if(!("serviceWorker" in navigator))return false;const r=await navigator.serviceWorker.getRegistration();return !!r?.active})()','service worker instalado',20000);
  console.log('Gate D: login mock, cofre criptografado e Service Worker ativos.');
  await browser.send('Network.emulateNetworkConditions',{offline:true,latency:0,downloadThroughput:0,uploadThroughput:0});
  await browser.until('navigator.onLine===false','offline real no Chrome');
