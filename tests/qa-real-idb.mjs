@@ -82,6 +82,8 @@ function ping(){return new Promise(resolve=>{
 })}
 async function ready(){for(let i=0;i<15;i++){if(await ping())return;await new Promise(r=>setTimeout(r,200))}throw Error('Servidor de testes não iniciou')}
 async function runPhase(stage){
+ // Remover endpoint DevTools antigo ao reutilizar o mesmo perfil em outro processo.
+ fs.rmSync(path.join(profile,'DevToolsActivePort'),{force:true});
  const chromeProcess=spawn(chrome,[
   '--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
   '--no-first-run','--disable-extensions','--disable-background-networking',
@@ -154,7 +156,7 @@ async function runPhase(stage){
    new Promise(resolve=>chromeProcess.once('exit',resolve)),
    wait(2000).then(()=>{if(chromeProcess.exitCode===null)chromeProcess.kill('SIGKILL')})
   ]);
-  await wait(250);
+  await wait(850);
  }
 }
 try{
