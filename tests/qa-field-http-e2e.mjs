@@ -50,8 +50,9 @@ async function launch(offline=false){
  let ws;
  const ready=async()=>{
   const flag=path.join(profile,'DevToolsActivePort');let port=0;
-  for(let i=0;i<90;i++){
+  for(let i=0;i<220;i++){
    if(fs.existsSync(flag)){port=Number(fs.readFileSync(flag,'utf8').split('\n')[0]);if(port>0)break}
+   if(proc.exitCode!==null)break;
    await wait(100);
   }
   assert.ok(port,'Porta DevTools não encontrada; binário='+chrome+' exit='+proc.exitCode+' signal='+proc.signalCode+' logs='+chromeStderr.slice(-750));
