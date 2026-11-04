@@ -127,7 +127,7 @@ const isShown=id=>'!!document.querySelector("#'+id+'")&&!document.querySelector(
 try{
  browser=await launch(false);
  await browser.until(isShown('loginView'),'login online');
- await browser.evalJS('(()=>{document.querySelector("#email").value="qa@ot.invalid";document.querySelector("#password").value="SomenteTesteOT-2026!";document.querySelector("#loginForm").requestSubmit();return true})()');
+ await browser.evalJS('(()=>{document.querySelector("#email").value="qa@ot.invalid";document.querySelector("#password").value="SomenteTesteOT-2026!";document.querySelector("#loginForm button[type=submit]").click();return true})()');
  try{await browser.until(isShown('appView'),'entrar na carteira');}
  catch(e){
   const details=await browser.evalJS('({toast:document.querySelector("#toast")?.textContent,loginHidden:document.querySelector("#loginView")?.classList.contains("hidden"),setupHidden:document.querySelector("#setupView")?.classList.contains("hidden"),state:document.querySelector("#connectionState")?.textContent,api:window.OT_CONFIG?.url})');
@@ -136,7 +136,7 @@ try{
  }
  await browser.evalJS('document.querySelector("#prepareFieldBtn").click();true');
  await browser.until('document.querySelector("#vaultDialog").open','preparação do cofre');
- await browser.evalJS('(()=>{document.querySelector("#vaultPassword").value='+JSON.stringify(PWD)+';document.querySelector("#vaultForm").requestSubmit();return true})()');
+ await browser.evalJS('(()=>{document.querySelector("#vaultPassword").value='+JSON.stringify(PWD)+';document.querySelector("#vaultForm button[type=submit]").click();return true})()');
  await browser.until('document.querySelector("#fieldState").textContent.includes("desbloqueado")','cofre preparado',25000);
  await browser.until('(async()=>{if(!("serviceWorker" in navigator))return false;const r=await navigator.serviceWorker.ready;return !!r.active})()','service worker instalado',20000);
  console.log('Gate D: login mock, cofre criptografado e Service Worker ativos.');
@@ -144,10 +144,10 @@ try{
  await browser.until('navigator.onLine===false','offline real no Chrome');
  await browser.evalJS('document.querySelector("#newBtn").click();true');
  await browser.until('document.querySelector("#companyDialog").open','abrir cadastro');
- await browser.evalJS('(()=>{const f=document.querySelector("#companyForm");f.elements.namedItem("nome").value="LOJA QA SEM INTERNET";f.elements.namedItem("briefing").value="Site institucional e presença Google (apenas teste)";f.elements.namedItem("bairro").value="São Marcos";f.requestSubmit();return true})()');
+ await browser.evalJS('(()=>{const f=document.querySelector("#companyForm");f.elements.namedItem("nome").value="LOJA QA SEM INTERNET";f.elements.namedItem("briefing").value="Site institucional e presença Google (apenas teste)";f.elements.namedItem("bairro").value="São Marcos";f.querySelector("button[type=submit]").click();return true})()');
  await browser.until('document.querySelector("#pendingCount").textContent.startsWith("1 pendente")','empresa local',24000);
  await browser.until(isShown('companyPanel'),'abrir ficha do teste');
- await browser.evalJS('(()=>{document.querySelector("#visitNote").value="Visita de teste sem internet";document.querySelector("#visitNext").value="Mostrar portfólio";document.querySelector("#visitReturn").value="2026-11-09";document.querySelector("#visitForm").requestSubmit();return true})()');
+ await browser.evalJS('(()=>{document.querySelector("#visitNote").value="Visita de teste sem internet";document.querySelector("#visitNext").value="Mostrar portfólio";document.querySelector("#visitReturn").value="2026-11-09";document.querySelector("#visitForm button[type=submit]").click();return true})()');
  await browser.until('document.querySelector("#pendingCount").textContent.startsWith("2 pendentes")','visita local',20000);
  await browser.evalJS('(()=>{const f=new File([new Uint8Array([137,80,78,71,13,10,26,10])],"teste.png",{type:"image/png"});const dt=new DataTransfer();dt.items.add(f);const input=document.querySelector("#photoFiles");input.files=dt.files;input.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
  await browser.until('document.querySelector("#pendingCount").textContent.startsWith("3 pendentes")','foto local',25000);
@@ -160,7 +160,7 @@ try{
  await browser.close();browser=null;
  browser=await launch(true);
  await browser.until(isShown('offlineLoginView'),'reabrir sem internet',25000);
- await browser.evalJS('(()=>{document.querySelector("#offlinePassword").value='+JSON.stringify(PWD)+';document.querySelector("#offlineUnlockForm").requestSubmit();return true})()');
+ await browser.evalJS('(()=>{document.querySelector("#offlinePassword").value='+JSON.stringify(PWD)+';document.querySelector("#offlineUnlockForm button[type=submit]").click();return true})()');
  await browser.until(isShown('appView'),'desbloquear offline',25000);
  await browser.until('document.querySelector("#pendingCount").textContent.startsWith("3 pendentes")','fila recuperada',25000);
  assert.equal(await browser.evalJS('document.querySelector("#companyList").textContent.includes("LOJA QA SEM INTERNET")'),true);
@@ -171,7 +171,7 @@ try{
  await browser.evalJS('document.querySelector("#syncPendingBtn").click();true');
  const state=await browser.until('(()=>{const login=document.querySelector("#loginView");const queue=document.querySelector("#pendingCount");return !login.classList.contains("hidden")?"login":queue.textContent==="0 pendentes"?"synced":false})()','reautenticação ou sync',15000);
  if(state==='login'){
-  await browser.evalJS('(()=>{document.querySelector("#email").value="qa@ot.invalid";document.querySelector("#password").value="SomenteTesteOT-2026!";document.querySelector("#loginForm").requestSubmit();return true})()');
+  await browser.evalJS('(()=>{document.querySelector("#email").value="qa@ot.invalid";document.querySelector("#password").value="SomenteTesteOT-2026!";document.querySelector("#loginForm button[type=submit]").click();return true})()');
  }
  await browser.until('document.querySelector("#pendingCount").textContent==="0 pendentes"','sincronização com confirmação HTTP',30000);
  assert.equal(mock.map.ot_empresas.size,1,'Empresa não chegou ao mock');
