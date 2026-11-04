@@ -88,3 +88,10 @@ Respostas devem ser humanas, consultivas, sem depreciar Instagram, Facebook, Wha
 - Criar `og:image` JPG/PNG com o logotipo oficial para prévias grandes (a versão atual contém título/descrição OG apenas).
 - Verificar materiais de divulgação com o responsável pela empresa antes de publicar imagens/cases.
 - O modo offline V1.3 continua separado; combinar Service Worker e cache público da apresentação somente após aprovação do Gate D.
+
+## Ajuste visual aprovado — Premium Clean, redução de pontos do card
+- Em `card-export.js`, substituir a grade integral de pontos (~336) por 23 partículas pequenas e discretas: 20 nas laterais e 3 no alto, à direita.
+- Opacidade reduzida: `rgba(130,204,255,0.085)` e `0.055`, raio 1,15/1,05 px.
+- Manter área central livre de textura, priorizar a leitura de títulos e benefícios.
+- Preservar degradês, paleta, CTA, dimensões 1080×1920 e uso da arte oficial do logotipo.
+- Conferir no Android/Windows o enquadramento final; não alterar fontes, conteúdo, estrutura nem propriedades do compartilhamento.
