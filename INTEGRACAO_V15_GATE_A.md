@@ -41,3 +41,28 @@ Implementar cofre local criptografado e fila com IDs estáveis, executar testes 
 - Chaves e senha não são gravadas em disco; desbloqueio exige senha de pelo menos 12 caracteres.
 - O módulo não é integrado aos formulários do CRM nem cria sessões offline por conta própria.
 - Antes de abrir para clientes reais: homologar UI, persistência com navegador fechado, política de recuperação, upload idempotente e segurança do dispositivo.
+
+
+## Gate C — Fluxo de campo implementado em branch (04/11/2026)
+- CRM: nova empresa, visita e fotografia passam primeiro pelo cofre AES-GCM quando desbloqueado; a interface informa **Salvo no aparelho** até receber confirmação remota.
+- Novo desbloqueio local ao abrir sem internet; usuário deve preparar o cofre numa sessão autenticada online e guardar uma senha local própria.
+- Fichas e históricos consultados online ficam em snapshot criptografado, sem criar operações de reenvio; pendências locais não são sobrescritas pelo snapshot.
+- Fila: contador, botão Sincronizar agora, retomada ao receber evento online quando há sessão válida; sem sessão, solicita autenticação da MESMA conta antes de enviar.
+- Envio de empresa, visita, fotos com IDs UUID fixos, ordem de dependência, releitura de confirmação e proteção contra duplicidade após timeout.
+- Fotografias: caminho de Storage determinístico por proprietário/empresa/foto, verificação por SHA-256 quando o arquivo existe, depois inserção de metadados.
+- Conflitos detectados por campos relevantes: o registro local não é descartado se divergir da nuvem.
+- Exclusões de registros pendentes bloqueadas; alterações offline de empresas existentes bloqueadas até implementar conciliação específica.
+- Nenhum dado real de cliente foi usado nos testes. Nenhuma alteração foi aplicada ao Supabase de produção.
+
+### Evidências parciais
+- Testes de idempotência: inserção depois de timeout, visita com retorno parcial, upload parcial, conflito e ordem de dependências.
+- WebCrypto e IndexedDB real em Chromium/localhost: criação, saída do Chrome, reabertura, senha incorreta rejeitada, fotos e fila recuperadas.
+- Testes de interface estática, preservação do Premium e renderização dos cards no Chrome.
+
+### Gate de produção ainda BLOQUEADO
+- Testar no Edge Android real, Safari iOS e Edge Windows, especialmente câmera e armazenamento após fechar o aplicativo.
+- Conferir cadastros/sincronização end-to-end em ambiente de teste isolado do Supabase antes de usar dados reais.
+- Exercitar falha de rede enquanto o aparelho indica online, falhas de quota e recuperação/backup de dados pendentes.
+- Validar conflitos de atualizações existentes, multiabas, logout e senhas esquecidas.
+- Confirmar política de armazenamento local/LGPD e limite de 12 fotos/empresa.
+- Aprovação expressa antes de merge/publicação; a V1.2 permanece a única versão de produção.
