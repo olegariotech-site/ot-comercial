@@ -44,7 +44,9 @@ async function launch(offline=false){
   '--disable-dev-shm-usage','--disable-extensions','--no-first-run',
   '--ignore-certificate-errors','--disable-background-networking',
   '--remote-debugging-port=0','--remote-allow-origins=*',
-  '--user-data-dir='+profile,'about:blank'],{stdio:'ignore'});
+  '--user-data-dir='+profile,'about:blank'],{stdio:['ignore','ignore','pipe']});
+ let chromeStderr='';
+ proc.stderr.on('data',chunk=>{chromeStderr=(chromeStderr+chunk.toString()).slice(-2500)});
  let ws;
  const ready=async()=>{
   const flag=path.join(profile,'DevToolsActivePort');let port=0;
@@ -52,7 +54,7 @@ async function launch(offline=false){
    if(fs.existsSync(flag)){port=Number(fs.readFileSync(flag,'utf8').split('\n')[0]);if(port>0)break}
    await wait(100);
   }
-  assert.ok(port,'Porta DevTools não encontrada');
+  assert.ok(port,'Porta DevTools não encontrada; binário='+chrome+' exit='+proc.exitCode+' signal='+proc.signalCode+' logs='+chromeStderr.slice(-750));
   let target=null;
   for(let i=0;i<50;i++){
    try{
