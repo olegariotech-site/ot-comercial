@@ -83,7 +83,8 @@ export function startMockSupabase(root,tls=null){
     return fail(res,405,'Verbo Storage não simulado');
    }
    if(req.method!=='GET')return fail(res,405,'Somente GET permitido em arquivos');
-   const safe=path.resolve(root,'.'+pathname);
+   const staticPath=pathname==='/'?'/index.html':pathname;
+   const safe=path.resolve(root,'.'+staticPath);
    if(!safe.startsWith(path.resolve(root)+path.sep))return fail(res,403,'Caminho fora dos testes');
    const stat=fs.existsSync(safe)&&fs.statSync(safe).isFile();
    if(!stat)return fail(res,404,'Arquivo ausente: '+pathname);
