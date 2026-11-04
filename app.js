@@ -7,9 +7,14 @@ const cfg = window.OT_CONFIG || {};
 const bucket = 'ot-clientes-privado';
 const tokenStorageKey = 'ot_comercial_v12_sessao';
 let session = null, userId = null, companies = [], active = null, photos = [], objectUrls = [];
+let offlineMode=false, syncBusy=false;
+const offlineOwnerKey='ot_comercial_offline_owner_v1';
+function fieldReady(){return !!(userId&&window.OTOfflineVault?.activeOwner()===userId);}
+function rememberedOwner(){try{return localStorage.getItem(offlineOwnerKey)||'';}catch{return '';}}
+function rememberOwner(owner){try{localStorage.setItem(offlineOwnerKey,owner);}catch{}}
 const statusGood = new Set(['Interessado','Proposta solicitada','Em negociação']);
 const fields = ['nome','segmento','bairro','cidade','endereco','responsavel','whatsapp','presenca_digital','briefing','observacoes','status','retorno_em'];
-function show(id) { ['setupView','loginView','appView'].forEach(x=>$(x).classList.toggle('hidden', x!==id)); $('logoutBtn').hidden=id!=='appView'; }
+function show(id) { ['setupView','loginView','offlineLoginView','appView'].forEach(x=>$(x).classList.toggle('hidden', x!==id)); $('logoutBtn').hidden=id!=='appView'; }
 function toast(msg) { const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>el.style.display='none',6000); }
 function fmtDate(v){ if(!v)return 'Não agendado'; const [y,m,d]=v.split('-');return `${d}/${m}/${y}`; }
 function esc(s){return String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
@@ -45,8 +50,142 @@ async function login(email,password){const r=await raw(base+'/auth/v1/token?gran
  const d=await r.json();storeSession({...d,expires_at:Math.floor(Date.now()/1000)+d.expires_in});
  const me=await raw(base+'/auth/v1/user',{headers:headers(true)});userId=(await me.json()).id;if(!userId)throw Error('Não foi possível validar o usuário.');}
 async function restore(){try{const s=JSON.parse(sessionStorage.getItem(tokenStorageKey)||'null');if(!s)return false;session=s;await authenticated();const me=await raw(base+'/auth/v1/user',{headers:headers(true)});const u=await me.json();if(!u.id)throw Error('Sessão inválida');userId=u.id;return true;}catch{storeSession(null);userId=null;return false;}}
-function logout(){storeSession(null);userId=null;companies=[];active=null;photos=[];destroyObjectUrls();show('loginView');$('connectionState').textContent='Sessão encerrada';}
-async function load(){const items=await request('ot_empresas?select=*&order=created_at.desc');companies=items;render();}
+function logout(){window.OTOfflineVault?.lock();offlineMode=false;storeSession(null);userId=null;companies=[];active=null;photos=[];destroyObjectUrls();show('loginView');$('connectionState').textContent='Sessão encerrada';updateFieldState().catch(()=>{});}
+async function updateFieldState(){
+ const label=$('fieldState'),count=$('pendingCount'),button=$('syncPendingBtn');
+ if(!label||!count||!button)return;
+ if(!fieldReady()){
+  label.textContent='Cofre bloqueado — prepare antes das visitas';
+  count.textContent='Pendências não consultadas';button.disabled=true;return;
+ }
+ const p=await window.OTOfflineVault.pending();
+ label.textContent=offlineMode?'Trabalhando com dados criptografados no aparelho':'Cofre desbloqueado — pronto para o campo';
+ count.textContent=p.length+' pendente'+(p.length===1?'':'s');
+ button.disabled=syncBusy||!p.length||navigator.onLine===false;
+}
+async function prepareVault(){
+ if(!userId||offlineMode){toast('Entre na nuvem para preparar seu dispositivo.');return}
+ const exists=await window.OTOfflineVault.has(userId);
+ $('vaultExplanation').textContent=exists
+  ?'Digite sua senha local para desbloquear os registros protegidos deste aparelho.'
+  :'Crie uma senha local de pelo menos 12 caracteres. Sem ela, pendências não sincronizadas não podem ser recuperadas.';
+ $('vaultPassword').value='';
+ $('vaultForm').dataset.existing=exists?'yes':'no';
+ $('vaultDialog').showModal();
+}
+async function handleVaultSetup(ev){
+ ev.preventDefault();
+ const btn=ev.submitter;btn.disabled=true;
+ try{
+  if(!userId||offlineMode)throw Error('Entre na nuvem primeiro.');
+  const pass=$('vaultPassword').value;
+  if($('vaultForm').dataset.existing==='yes')await window.OTOfflineVault.unlock(userId,pass);
+  else await window.OTOfflineVault.create(userId,pass);
+  $('vaultPassword').value='';$('vaultDialog').close();
+  rememberOwner(userId);
+  await window.OTOfflineVault.persist();
+  await load();toast('Cofre local desbloqueado. Fichas consultadas ficam protegidas no aparelho.');
+  await updateFieldState();
+ }catch(e){toast('Cofre não ativado: '+safeErr(e));}
+ finally{btn.disabled=false;}
+}
+async function unlockOffline(ev){
+ ev.preventDefault();const btn=ev.submitter;btn.disabled=true;
+ try{
+  const owner=rememberedOwner();
+  if(!owner||!await window.OTOfflineVault.has(owner))throw Error('Nenhum cofre offline preparado neste aparelho.');
+  await window.OTOfflineVault.unlock(owner,$('offlinePassword').value);
+  $('offlinePassword').value='';userId=owner;offlineMode=true;
+  show('appView');$('connectionState').textContent='Offline — salvo no aparelho';
+  await load();toast('Cofre desbloqueado. Registros feitos aqui aguardam a nuvem.');
+ }catch(e){toast('Acesso offline negado: '+safeErr(e));}finally{btn.disabled=false;}
+}
+function cloudApi(owner){
+ return {
+  owner,
+  getRow:async(table,id)=>{
+   const rows=await request(table+'?select=*&id=eq.'+encodeURIComponent(id)+'&limit=1');
+   return rows[0]||null;
+  },
+  insertRow:async(table,row)=>request(table,{method:'POST',body:row}),
+  updateReturn:async(companyId,date)=>request('ot_empresas?id=eq.'+encodeURIComponent(companyId),{
+   method:'PATCH',body:{retorno_em:date}
+  }),
+  ensurePhoto:async(path,blob)=>{
+   const url=base+'/storage/v1/object/'+bucket+'/'+encodePath(path);
+   const readExisting=async(retry=true)=>{
+    await authenticated();
+    let resp;
+    try{resp=await fetch(base+'/storage/v1/object/authenticated/'+bucket+'/'+encodePath(path),{
+     headers:headers(true)
+    });}catch{throw Error('Falha de conexão ao conferir a fotografia.');}
+    if(resp.status===401&&retry){await refreshSession();return readExisting(false)}
+    if(resp.status===404)return null;
+    if(!resp.ok)throw Error('Não foi possível conferir fotografia na nuvem (HTTP '+resp.status+').');
+    return resp.blob();
+   };
+   const fingerprint=async b=>{
+    const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',await b.arrayBuffer()));
+    return [...bytes].map(x=>x.toString(16).padStart(2,'0')).join('');
+   };
+   const verify=async existing=>{
+    if(!existing)return false;
+    if(existing.size!==blob.size||await fingerprint(existing)!==await fingerprint(blob))
+     throw Error('Conflito: o arquivo remoto é diferente do arquivo local.');
+    return true;
+   };
+   if(await verify(await readExisting()))return;
+   await authenticated();let resp;
+   try{resp=await fetch(url,{method:'POST',headers:{...headers(true),'Content-Type':blob.type,
+    'x-upsert':'false'},body:blob})}catch{throw Error('Envio interrompido; foto mantida no cofre.');}
+   if(!resp.ok){
+    if(resp.status===409&&await verify(await readExisting()))return;
+    throw Error('Upload não concluído (HTTP '+resp.status+').');
+   }
+   if(!await verify(await readExisting()))throw Error('Servidor ainda não confirmou o arquivo.');
+  }
+ };
+}
+async function syncNow(){
+ if(syncBusy||!fieldReady())return;
+ if(navigator.onLine===false){toast('Sem internet: seus registros permanecem no aparelho.');return}
+ syncBusy=true;await updateFieldState();
+ try{
+  if(offlineMode||!session?.access_token){
+   const owner=window.OTOfflineVault.activeOwner(),ok=await restore();
+   if(!ok||owner!==userId){
+    offlineMode=false;show('loginView');
+    toast('Entre na nuvem com a MESMA conta para sincronizar os dados locais.');return;
+   }
+   offlineMode=false;show('appView');
+  }
+  await authenticated();
+  const summary=await window.OTFieldSync.sync({vault:window.OTOfflineVault,api:cloudApi(userId),
+   owner:userId,online:()=>navigator.onLine!==false});
+  if(summary.failed){
+   toast(summary.synced+' sincronizados; '+summary.pending+' pendentes. Nenhum registro local foi descartado.');
+  }else if(summary.synced){toast(summary.synced+' registros confirmados na nuvem.');}
+  if(!offlineMode)await load();
+ }catch(e){toast('Sincronização não concluída: '+safeErr(e));}
+ finally{syncBusy=false;await updateFieldState();}
+}
+async function load(){
+ if(offlineMode){
+  if(!fieldReady())throw Error('Cofre bloqueado');
+  companies=await window.OTOfflineVault.list('company');
+  render();return;
+ }
+ const items=await request('ot_empresas?select=*&order=created_at.desc');
+ if(fieldReady())await window.OTOfflineVault.snapshot('company',items);
+ const locals=fieldReady()?await window.OTOfflineVault.list('company'):[];
+ const byId=new Map(items.map(item=>[item.id,item]));
+ if(fieldReady()){
+  const pending=await window.OTOfflineVault.pending();
+  const pendingIds=new Set(pending.filter(x=>x.kind==='company').map(x=>x.payload.id));
+  for(const local of locals)if(pendingIds.has(local.id)&&!byId.has(local.id))byId.set(local.id,local);
+ }
+ companies=[...byId.values()];render();await updateFieldState();
+}
 function render(){const term=convertRaw($('search').value.trim());const status=$('statusFilter').value;
  const filtered=companies.filter(c=>(!status||c.status===status)&&(!term||convertRaw([c.nome,c.bairro,c.cidade,c.responsavel,c.segmento,c.whatsapp].join(' ')).includes(term)));
  $('countAll').textContent=companies.length;
