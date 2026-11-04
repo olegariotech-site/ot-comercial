@@ -21,3 +21,6 @@ jobs:
       - name: Validar manifesto e referências
         run: |
           node -e "const fs=require('fs');const m=JSON.parse(fs.readFileSync('manifest.webmanifest'));if(!m.start_url||m.icons.length<2)process.exit(1);for(const i of m.icons){if(!fs.existsSync(i.src.replace(/^\.\//,'')))process.exit(2)}"
+
+      - name: Testar cofre criptografado e fila local
+        run: node tests/test_offline_crypto.cjs
