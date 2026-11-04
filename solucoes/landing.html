@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b1120"><meta name="robots" content="noindex,follow">
+<title>Landing Page | OLEGARIO TECH</title><meta name="description" content="Uma apresentação enxuta e profissional para clientes encontrarem sua empresa e falarem com você.">
+<meta property="og:type" content="website"><meta property="og:site_name" content="OLEGARIO TECH"><meta property="og:title" content="Landing Page | OLEGARIO TECH"><meta property="og:description" content="Uma apresentação enxuta e profissional para clientes encontrarem sua empresa e falarem com você."><meta property="og:url" content="https://olegariotech-site.github.io/ot-comercial/solucoes/landing.html">
+<meta name="twitter:card" content="summary"><meta name="twitter:title" content="Landing Page | OLEGARIO TECH"><meta name="twitter:description" content="Uma apresentação enxuta e profissional para clientes encontrarem sua empresa e falarem com você.">
+<link rel="canonical" href="https://olegariotech-site.github.io/ot-comercial/solucoes/landing.html"><link rel="stylesheet" href="../apresentacao-servico.css"></head>
+<body><div class="wrap"><nav><strong>OLEGARIO TECH</strong><a href="../apresentacao-ot.html">Todas as soluções ↗</a></nav>
+<main><section class="panel"><div class="eyebrow">Presença digital · Soluções digitais para negócios</div><h1>Landing Page</h1><p class="lead">Uma apresentação enxuta e profissional para clientes encontrarem sua empresa e falarem com você.</p>
+<h2>Por que é importante</h2><p>Sua empresa deixa de depender exclusivamente da bio das redes para reunir serviços, endereço, horários e contato.</p><div class="benefit">Mais clareza para quem procura seu negócio.</div><h2>O que podemos entregar</h2><ul><li>Uma página responsiva com até cinco seções</li><li>WhatsApp e informações essenciais</li><li>SEO técnico básico e orientação de domínio</li></ul><p class="price">Projetos essenciais: referência a partir de R$ 790, conforme escopo.</p>
+<p><a href="https://armazemripamonti.com.br/" target="_blank" rel="noopener">Ver projeto relacionado ↗</a></p><div class="actions"><button class="btn primary" id="share" type="button">Compartilhar apresentação</button><a class="btn" id="whats" target="_blank" rel="noopener">Enviar pelo WhatsApp ↗</a><button class="btn" id="copy" type="button">Copiar link</button></div>
+<p class="note" id="status" role="status" aria-live="polite">Consultoria e orçamento personalizados. Resultados de busca e de vendas não são garantidos.</p></section></main><footer>OLEGARIO TECH | Soluções Digitais para Negócios</footer></div>
+<script>
+'use strict';
+const info={title:"OLEGARIO TECH | Landing Page",text:"Uma apresentação enxuta e profissional para clientes encontrarem sua empresa e falarem com você.",url:"https://olegariotech-site.github.io/ot-comercial/solucoes/landing.html"};
+document.getElementById('whats').href='https://wa.me/?text='+encodeURIComponent(info.title+'\n'+info.text+'\n'+info.url);
+async function copy(){try{await navigator.clipboard.writeText(info.url);document.getElementById('status').textContent='Link copiado!';}catch{window.prompt('Copie o endereço:',info.url);}}
+document.getElementById('copy').addEventListener('click',copy);
+document.getElementById('share').addEventListener('click',async()=>{if(navigator.share){try{await navigator.share(info);return}catch(e){if(e.name==='AbortError')return}}await copy()});
+</script></body></html>
