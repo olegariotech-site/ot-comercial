@@ -62,6 +62,7 @@ window.OTFieldSync=(()=>{
       local={...photo.metadata,storage_path:deterministicPhotoPath(owner,photo.metadata)};
      }else local=await vault.get(kind,id);
      if(!local||!matches(kind,remote,local))throw Error('Conflito: registro com o mesmo ID foi alterado na nuvem');
+     if(kind==='visit'&&local.retorno_em)await api.updateReturn(local.empresa_id,local.retorno_em);
      await vault.acknowledge(task.opId);result.synced++;result.pending--;onProgress?.(result);continue;
     }
     let local;
@@ -84,6 +85,7 @@ window.OTFieldSync=(()=>{
     }
     const confirmed=await api.getRow(TABLE[kind],id);
     if(!confirmed||!matches(kind,confirmed,row))throw Error('Servidor não confirmou o registro');
+    if(kind==='visit'&&row.retorno_em)await api.updateReturn(row.empresa_id,row.retorno_em);
     await vault.acknowledge(task.opId);
     result.synced++;result.pending--;
    }catch(e){
