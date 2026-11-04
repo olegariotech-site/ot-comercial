@@ -6,7 +6,7 @@ import vm from 'node:vm';
 const file = name => fs.readFileSync(new URL('../'+name,import.meta.url),'utf8');
 const html=file('index.html'),sw=file('sw.js'),manifest=JSON.parse(file('manifest.webmanifest'));
 const workflow=file('.github/workflows/deploy-pages.yml');
-const style=file('style.css'),app=file('app.js'),store=file('offline-store.js');
+const style=file('style.css'),app=file('app.js'),store=file('offline-vault.js');
 
 test('Versão integrada preserva o CRM Premium e registra apenas shell público',()=>{
  assert.match(html,/OT Comercial V1\.5/);
@@ -18,7 +18,9 @@ test('Versão integrada preserva o CRM Premium e registra apenas shell público'
  assert.match(html,/ainda NÃO são salvos offline/);
  assert.match(style,/offline-notice\[hidden\]\{display:none!important\}/);
  assert.doesNotMatch(app,/OTOffline\./,'Não integrar módulo sem criptografia a dados reais');
- assert.match(store,/armazenamento EXPERIMENTAL/);
+ assert.match(store,/AES-GCM/);
+ assert.match(store,/PBKDF2/);
+ assert.doesNotMatch(app,/OTOfflineVault\./);
  assert.match(workflow,/cp sw\.js offline-store\.js offline-status\.js manifest\.webmanifest ot-icon\.svg _site\//);
  assert.match(workflow,/branches:\s*\[main\]/,'Nenhum deploy automático a partir desta branch');
  assert.equal(manifest.scope,'./');
@@ -80,7 +82,7 @@ test('Aviso offline aparece e não afirma que dados foram sincronizados',()=>{
 });
 
 test('Scripts JS integrados têm sintaxe válida',()=>{
- for(const name of ['sw.js','offline-store.js','offline-status.js','ot-logo.js','card-export.js']){
+ for(const name of ['sw.js','offline-vault.js','offline-status.js','ot-logo.js','card-export.js']){
   assert.doesNotThrow(()=>new vm.Script(file(name),{filename:name}));
  }
 });
