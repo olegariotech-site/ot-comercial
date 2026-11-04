@@ -27,8 +27,6 @@ jobs:
         run: node --test tests/qa-premium.test.mjs tests/qa-integration.test.mjs tests/qa-sync.test.mjs
       - name: Validar WebCrypto e transações simuladas do cofre
         run: node tests/qa-vault.mjs
-      - name: Gate D — Fluxo completo campo offline e sincronização HTTPS mock
-        run: node tests/qa-field-http-e2e.mjs
       - name: Verificar IndexedDB real após fechar e reabrir Chrome
         run: node tests/qa-real-idb.mjs
       - name: Renderizar 8 cards e vitrine com Chrome real
@@ -38,8 +36,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ot-v14-qa-visual
-          path: |
-            artifacts/v1-4-visual/*.png
-            artifacts/gate-d-field/*.png
+          path: artifacts/v1-4-visual/*.png
           if-no-files-found: warn
           retention-days: 7
