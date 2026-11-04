@@ -1,0 +1,10 @@
+{
+  "name": "OT Comercial | Carteira Comercial",
+  "short_name": "OT Comercial",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d1525",
+  "theme_color": "#0d1525",
+  "description": "Sistema comercial da Olegario Tech"
+}
