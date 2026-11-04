@@ -30,7 +30,7 @@ window.OTCardExport=(()=>{
   ctx.lineTo(x+radius,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-radius);
   ctx.lineTo(x,y+radius);ctx.quadraticCurveTo(x,y,x+radius,y);ctx.closePath();
  }
- function render(service){
+ function render(service,logo){
   if(!service?.title||!service?.intro||!service?.benefit)throw Error('Card incompleto');
   const canvas=document.createElement('canvas');canvas.width=WIDTH;canvas.height=HEIGHT;
   const ctx=canvas.getContext('2d');if(!ctx)throw Error('Canvas indisponível');
@@ -39,6 +39,7 @@ window.OTCardExport=(()=>{
   const purple=ctx.createRadialGradient(30,1460,0,30,1460,760);purple.addColorStop(0,'#6440A666');purple.addColorStop(1,'#6440A600');ctx.fillStyle=purple;ctx.fillRect(0,700,WIDTH,HEIGHT-700);
   ctx.strokeStyle='#82cfff21';ctx.lineWidth=2;for(let x=82;x<WIDTH;x+=74){for(let y=160;y<HEIGHT;y+=74){ctx.beginPath();ctx.arc(x,y,1.5,0,Math.PI*2);ctx.stroke()}}
   ctx.fillStyle='#8EDEFF';ctx.fillRect(90,135,90,7);
+  if(logo){ctx.save();rectangle(ctx,832,130,160,160,20);ctx.clip();ctx.drawImage(logo,832,130,160,160);ctx.restore();}
   ctx.fillStyle=color.white;ctx.font='800 43px system-ui, sans-serif';ctx.fillText('OLEGARIO TECH',90,235);
   ctx.fillStyle=color.muted;ctx.font='500 23px system-ui, sans-serif';ctx.fillText('SOLUÇÕES DIGITAIS PARA NEGÓCIOS',90,277);
   ctx.fillStyle='#A7DFF7';ctx.font='700 25px system-ui, sans-serif';ctx.fillText(String(service.tag||'SOLUÇÃO DIGITAL').toUpperCase().slice(0,45),92,460);
@@ -60,7 +61,13 @@ window.OTCardExport=(()=>{
  }
  function toBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(Error('Falha ao gerar PNG')),'image/png'))}
  function fileName(s){return 'OT-'+String(s.id||'apresentacao').replace(/[^a-z0-9-]/gi,'').slice(0,40)+'-1080x1920.png'}
- async function create(service){const canvas=render(service);const blob=await toBlob(canvas);return new File([blob],fileName(service),{type:'image/png'})}
+ let logoPromise;
+ async function loadLogo(){
+  if(!window.OTBrandLogo)return null;
+  if(!logoPromise)logoPromise=new Promise(resolve=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>resolve(null);im.src=window.OTBrandLogo});
+  return logoPromise;
+ }
+ async function create(service){const canvas=render(service,await loadLogo());const blob=await toBlob(canvas);return new File([blob],fileName(service),{type:'image/png'})}
  function download(file){const u=URL.createObjectURL(file);const a=document.createElement('a');a.href=u;a.download=file.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000)}
  async function save(service){const file=await create(service);download(file);return file}
  async function share(service){
