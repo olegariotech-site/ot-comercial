@@ -71,3 +71,20 @@ Respostas devem ser humanas, consultivas, sem depreciar Instagram, Facebook, Wha
 - PWA/IndexedDB/Sync robusto já iniciado na V1.3; garantir que Service Worker não armazene responses privadas.
 
 **Decisão do gate:** documentação e código de rascunho aprovados para avaliação; nenhuma modificação em banco ou publicação nesta etapa.
+
+
+## Atualização do gate — gerador de imagem, logo oficial e QA (04/11/2026)
+- `card-export.js`: gera card PNG 1080×1920 em Canvas, permite download e tentativa de compartilhamento nativo de arquivo, com fallback de download. Não usa dados privados do CRM.
+- `ot-logo.js`: contém, em Data URL WebP, cópia exata do símbolo oficial `assets/img/brand/olegario-tech-logo-oficial.webp` do repositório do site OT, SHA de origem `679f87403eb8cdaa16b8ae0364e61551093a7727`. A imagem não foi reinterpretada.
+- Logo utilizado no cabeçalho do CRM e da vitrine e em 8 páginas individuais, assim como nas imagens PNG exportadas.
+- Cada página de serviço também tem ação para baixar ou compartilhar PNG, além do link/WhatsApp.
+- Testes estáticos: **25 de 25 verificações aprovadas** (scripts, segurança básica por inspeção, caminhos, OG text, preservação da lógica operacional e empacotamento).
+- Teste isolado em Chromium local do gerador, sem logo na versão anterior: 1080×1920, PNG gerado, download funcionou; simulação do `navigator.share({files})` e seu fallback funcionaram. É teste do código de exportação, **não** homologação Android/iOS nem prova de renderização do logo incorporado posteriormente.
+
+### Pendências obrigatórias
+- Repetir teste visual do gerador com logo oficial e capturas da versão atual.
+- Testar Web Share File real em Android e Safari iOS; a permissão e o gesto do usuário podem limitar o compartilhamento após geração assíncrona.
+- Revisar tipografia, quebra de linha e enquadramento de 8 cards, texto em 320/360px e navegação em Safari.
+- Criar `og:image` JPG/PNG com o logotipo oficial para prévias grandes (a versão atual contém título/descrição OG apenas).
+- Verificar materiais de divulgação com o responsável pela empresa antes de publicar imagens/cases.
+- O modo offline V1.3 continua separado; combinar Service Worker e cache público da apresentação somente após aprovação do Gate D.
