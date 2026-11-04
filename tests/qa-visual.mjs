@@ -82,4 +82,30 @@ for(const service of services){
 }
 screenshot(path.join(root,'apresentacao-ot.html'),'vitrine-mobile-390.png','390,1000');
 screenshot(path.join(root,'apresentacao-ot.html'),'vitrine-desktop-1280.png','1280,900');
+
+// Renderização visual sintética do CRM: não autentica, não acessa Supabase,
+// não usa qualquer ficha ou dado de cliente real.
+const rawIndex=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const marker=rawIndex.indexOf('<script src="config.js"></script>');
+assert.ok(marker>0,'Ponto de scripts do CRM não encontrado');
+const companyCard='<button type="button" class="company-card"><div class="name">Empresa de demonstração</div><div class="meta">Comércio · Valinhos</div><div class="meta">Contato ilustrativo</div><div class="brief">Criar apresentação digital e integrar WhatsApp.</div><div class="status">Interessado · Retorno agendado</div></button>';
+const demoScript=[
+ 'document.getElementById("brandSymbol").src=window.OTBrandLogo||"";',
+ 'document.getElementById("appView").classList.remove("hidden");',
+ 'document.getElementById("loginView").classList.add("hidden");',
+ 'document.getElementById("setupView").classList.add("hidden");',
+ 'document.getElementById("connectionState").textContent="Demonstração visual";',
+ 'document.getElementById("logoutBtn").hidden=false;',
+ 'document.getElementById("countAll").textContent="1";',
+ 'document.getElementById("countHot").textContent="1";',
+ 'document.getElementById("companyList").innerHTML='+JSON.stringify(companyCard)+';'
+].join('\n');
+const fixturePath=path.join(root,'qa-crm-v14-preview.html');
+fs.writeFileSync(fixturePath,rawIndex.slice(0,marker)+
+ '<script src="ot-logo.js"></script><script>'+demoScript+'</script></body></html>');
+try{
+ screenshot(fixturePath,'crm-mobile-390.png','390,900');
+ screenshot(fixturePath,'crm-desktop-1280.png','1280,900');
+}finally{fs.rmSync(fixturePath,{force:true})}
+
 console.log('QA visual concluído: '+count+' cards e duas versões da vitrine');
