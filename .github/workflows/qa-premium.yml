@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: '22'
       - name: Testar vitrine, cards e integridade de arquivos
-        run: node --test tests/qa-premium.test.mjs tests/qa-integration.test.mjs
+        run: node --test tests/qa-premium.test.mjs tests/qa-integration.test.mjs tests/qa-sync.test.mjs
       - name: Validar WebCrypto e transações simuladas do cofre
         run: node tests/qa-vault.mjs
       - name: Renderizar 8 cards e vitrine com Chrome real
