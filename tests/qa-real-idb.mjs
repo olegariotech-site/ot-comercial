@@ -43,6 +43,7 @@ const html=[
 '  check((await v.pending()).length===3,"Fila de pendências incompleta");',
 ' }else if(stage==="reopen"){',
 '  check(await v.has(owner),"Cofre desapareceu depois de fechar o navegador");',
+'  check((await v.owners()).includes(owner),"Cofre não foi localizado pelos metadados");',
 '  let rejected=false;try{await v.unlock(owner,"Senha errada muito longa")}catch{rejected=true}',
 '  check(rejected,"Desbloqueou com senha incorreta");',
 '  await v.unlock(owner,pass);',
