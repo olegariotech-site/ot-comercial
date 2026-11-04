@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [feat/v1-4-vitrine-premium]
+    branches: [feat/v1-4-vitrine-premium, feat/v1-5-integracao-premium-offline]
 
 concurrency:
   group: ot-premium-${{ github.ref }}
@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: '22'
       - name: Testar vitrine, cards e integridade de arquivos
-        run: node --test tests/qa-premium.test.mjs
+        run: node --test tests/qa-premium.test.mjs tests/qa-integration.test.mjs
       - name: Renderizar 8 cards e vitrine com Chrome real
         run: node tests/qa-visual.mjs
       - name: Guardar capturas para auditoria manual
