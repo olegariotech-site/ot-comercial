@@ -266,9 +266,43 @@ async function saveVisit(ev){ev.preventDefault();if(!active)return;
  }catch(e){toast('Atenção: '+safeErr(e)+' Confira pendências antes de repetir.');}
  finally{btn.disabled=false;}
 }
-async function loadPhotos(id){destroyObjectUrls();photos=await request(`ot_fotos?select=*&empresa_id=eq.${encodeURIComponent(id)}&order=created_at.desc`);renderPhotoCards();
- for(const photo of photos){if(active?.id!==id)break;try{const resp=await request(`object/authenticated/${bucket}/${encodePath(photo.storage_path)}`,{storage:true});const blob=await resp.blob();const url=URL.createObjectURL(blob);objectUrls.push(url);const im=document.getElementById('img-'+photo.id);if(im)im.src=url;}catch{ /* restrição/falha isolada: não oferece imagem publicamente */ }} }
-function renderPhotoCards(){$('photoList').innerHTML=photos.map(p=>`<article class="photo-card"><img id="img-${esc(p.id)}" alt="${esc(p.categoria)} — ${esc(p.arquivo_nome)}" loading="lazy"><div class="photo-body"><strong>${esc(p.arquivo_nome)}</strong><p>${esc(p.categoria)}${p.publicacao_autorizada?' · uso autorizado':' · uso não autorizado'}</p><div class="photo-actions"><button class="btn secondary" data-download="${esc(p.id)}">↓ Baixar</button><button class="btn danger" data-delete-photo="${esc(p.id)}">Excluir</button></div></div></article>`).join('')||'<div class="empty">Ainda não há fotos. Use a câmera ou selecione imagens.</div>';}
+async function loadPhotos(id){
+ destroyObjectUrls();let cloud=[];
+ if(!offlineMode&&navigator.onLine!==false){
+  try{cloud=await request('ot_fotos?select=*&empresa_id=eq.'+encodeURIComponent(id)+'&order=created_at.desc')}
+  catch(e){if(!fieldReady())throw e;toast('Galeria na nuvem indisponível; exibindo fotos locais.');}
+ }
+ const staged=fieldReady()?(await OTOfflineVault.list('photo')).filter(x=>x.empresa_id===id):[];
+ const pending=new Set(fieldReady()?(await OTOfflineVault.pending()).filter(x=>x.kind==='photo').map(x=>x.payload.id):[]);
+ const merged=new Map(cloud.map(p=>[p.id,p]));
+ for(const p of staged)if(!merged.has(p.id))merged.set(p.id,{...p,__pending:pending.has(p.id)});
+ photos=[...merged.values()];renderPhotoCards();
+ for(const p of photos){
+  if(active?.id!==id)break;
+  try{
+   let blob;
+   if(p.__pending){const local=await OTOfflineVault.getPhoto(p.id);blob=local?.blob}
+   else if(!offlineMode&&navigator.onLine!==false&&p.storage_path){
+    const resp=await request('object/authenticated/'+bucket+'/'+encodePath(p.storage_path),{storage:true});
+    blob=await resp.blob();
+   }
+   if(!blob)continue;
+   const url=URL.createObjectURL(blob);objectUrls.push(url);
+   const im=document.getElementById('img-'+p.id);if(im)im.src=url;
+  }catch{ /* erro de foto isolado, mantendo galeria privada */ }
+ }
+}
+function renderPhotoCards(){
+ $('photoList').innerHTML=photos.map(p=>'<article class="photo-card"><img id="img-'+
+  esc(p.id)+'" alt="'+esc(p.categoria)+' — '+esc(p.arquivo_nome)+'" loading="lazy">'+
+  '<div class="photo-body"><strong>'+esc(p.arquivo_nome)+'</strong><p>'+
+  esc(p.categoria)+(p.__pending?' · SALVA NO APARELHO':p.publicacao_autorizada?
+  ' · uso autorizado':' · uso não autorizado')+'</p><div class="photo-actions">'+
+  '<button class="btn secondary" data-download="'+esc(p.id)+'">↓ Baixar</button>'+
+  (p.__pending?'':'<button class="btn danger" data-delete-photo="'+esc(p.id)+'">Excluir</button>')+
+  '</div></div></article>').join('')||
+  '<div class="empty">Ainda não há fotos. Use a câmera ou selecione imagens.</div>';
+}
 async function uploadPhotos(fileList){if(!active||!fileList.length)return;const allowed={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};const selected=[...fileList];let done=0;
  for(const file of selected){try{if(!allowed[file.type])throw Error(`Formato não aceito (${file.name}). Use JPG, PNG ou WebP.`);if(file.size>6*1024*1024)throw Error(`Foto acima de 6 MB: ${file.name}`);if(photos.length+done>=12)throw Error('Limite inicial de 12 fotos por empresa.');
  const path=`${userId}/${active.id}/${crypto.randomUUID()}.${allowed[file.type]}`;
