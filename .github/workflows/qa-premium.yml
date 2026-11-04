@@ -27,6 +27,8 @@ jobs:
         run: node --test tests/qa-premium.test.mjs tests/qa-integration.test.mjs tests/qa-sync.test.mjs
       - name: Validar WebCrypto e transações simuladas do cofre
         run: node tests/qa-vault.mjs
+      - name: Verificar IndexedDB real após fechar e reabrir Chrome
+        run: node tests/qa-real-idb.mjs
       - name: Renderizar 8 cards e vitrine com Chrome real
         run: node tests/qa-visual.mjs
       - name: Guardar capturas para auditoria manual
