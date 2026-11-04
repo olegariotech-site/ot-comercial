@@ -82,13 +82,14 @@ window.OTCardExport=(()=>{
  async function create(service){const canvas=render(service,await loadLogo());const blob=await toBlob(canvas);return new File([blob],fileName(service),{type:'image/png'})}
  function download(file){const u=URL.createObjectURL(file);const a=document.createElement('a');a.href=u;a.download=file.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000)}
  async function save(service){const file=await create(service);download(file);return file}
- async function share(service){
-  const file=await create(service);
+ // O menu nativo deve ser aberto diretamente pelo gesto: prepare o File antes do clique.
+ async function shareReady(file,service){
   if(navigator.share&&navigator.canShare?.({files:[file]})){
    try{await navigator.share({files:[file],title:'OLEGARIO TECH | '+service.title});return 'shared'}
    catch(e){if(e?.name==='AbortError')return 'canceled';}
   }
   download(file);return 'downloaded';
  }
- return {create,save,share};
+ async function share(service){return shareReady(await create(service),service)}
+ return {create,save,share,shareReady};
 })();
