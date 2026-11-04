@@ -89,7 +89,7 @@ function fakeBrowser() {
     Image:FakeImage,File:FakeFile,URL:{},navigator:{},setTimeout:noop
   };
   vm.runInNewContext(cardSource,browser);
-  return {api:browser.window.OTCardExport,canvas,calls};
+  return {api:browser.window.OTCardExport,canvas,calls,navigator:browser.navigator};
 }
 
 test('Oito cards 1080x1920: somente 23 pontos periféricos, com logo e texto na área',async()=>{
@@ -110,4 +110,22 @@ test('Oito cards 1080x1920: somente 23 pontos periféricos, com logo e texto na 
     assert.match(file.name,/^OT-[a-z-]+-1080x1920\.png$/);
     assert.equal(file.type,'image/png');
   }
+});
+
+
+test('Compartilhar PNG pronto aciona share imediatamente no gesto do usuário',async()=>{
+ const t=fakeBrowser();
+ const file=await t.api.create(services[0]);
+ let called=false,received;
+ t.navigator.canShare=payload=>Array.isArray(payload.files)&&payload.files[0]===file;
+ t.navigator.share=payload=>{called=true;received=payload;return Promise.resolve()};
+ const pending=t.api.shareReady(file,services[0]);
+ assert.equal(called,true,'navigator.share deve ser invocado antes de qualquer await');
+ assert.equal(received.files[0],file);
+ assert.equal(await pending,'shared');
+ for(const service of services){
+  const html=read('solucoes/'+service.id+'.html');
+  assert.match(html,/shareReady\(readyCard,cardData\)/,'Página não usa arquivo pronto: '+service.id);
+ }
+ assert.match(presentation,/shareReady\(readyFile,s\)/);
 });
