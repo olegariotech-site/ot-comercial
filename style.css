@@ -41,3 +41,13 @@ header{background:#0b1425e8;border-bottom-color:#3b5277}
 .offline-notice[hidden]{display:none!important}
 .offline-notice strong{color:#ffeccf}
 @media(max-width:640px){.offline-notice{margin:8px 13px 0;padding:11px 13px;font-size:12px}}
+
+/* OT Field: estados operacionais claros e botões acessíveis. */
+.field-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #375c7e;
+ border-radius:15px;padding:13px 15px;background:linear-gradient(115deg,#12223a,#181e37);margin:13px 0 18px}
+.field-controls>div{margin-right:auto;min-width:170px}.field-controls strong{display:block;font-size:14px}
+.field-controls small{display:block;font-size:11px;color:#bcd0e8;margin-top:3px}
+.pending-count{color:#d6e6ff;background:#263b5b;border:1px solid #45688b;padding:6px 11px;
+ border-radius:25px;font-size:12px;font-weight:750}
+#offlineLoginView .btn{margin-top:10px}
+@media(max-width:640px){.field-controls{align-items:stretch}.field-controls>div{flex:1 0 100%}.field-controls .btn{flex:1 1 42%}}
