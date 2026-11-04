@@ -303,15 +303,23 @@ function renderPhotoCards(){
   '</div></div></article>').join('')||
   '<div class="empty">Ainda não há fotos. Use a câmera ou selecione imagens.</div>';
 }
-async function uploadPhotos(fileList){if(!active||!fileList.length)return;const allowed={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};const selected=[...fileList];let done=0;
+async function uploadPhotos(fileList){if(!active||!fileList.length)return;const allowed={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};const selected=[...fileList];let done=0,staged=0;
  for(const file of selected){try{if(!allowed[file.type])throw Error(`Formato não aceito (${file.name}). Use JPG, PNG ou WebP.`);if(file.size>6*1024*1024)throw Error(`Foto acima de 6 MB: ${file.name}`);if(photos.length+done>=12)throw Error('Limite inicial de 12 fotos por empresa.');
+ if(fieldReady()){
+  await OTOfflineVault.stagePhoto({id:crypto.randomUUID(),empresa_id:active.id,
+   arquivo_nome:safeFile(file.name),categoria:$('photoCategory').value,
+   descricao:'',publicacao_autorizada:$('photoConsent').checked},file);
+  done++;staged++;toast('Foto '+done+' criptografada no aparelho; aguardando nuvem.');
+  continue;
+ }
+ if(offlineMode||navigator.onLine===false)throw Error('Desbloqueie o cofre antes de fotografar sem internet.');
  const path=`${userId}/${active.id}/${crypto.randomUUID()}.${allowed[file.type]}`;
  await authenticated();const upload=await raw(`${base}/storage/v1/object/${bucket}/${encodePath(path)}`,{method:'POST',headers:{...headers(true),'Content-Type':file.type,'x-upsert':'false'},body:file});
  if(!upload.ok)throw Error('Falha no envio da foto.');
  try{await request('ot_fotos',{method:'POST',body:{empresa_id:active.id,storage_path:path,arquivo_nome:safeFile(file.name),categoria:$('photoCategory').value,bytes:file.size,publicacao_autorizada:$('photoConsent').checked}});}catch(e){try{await request(`object/${bucket}/${encodePath(path)}`,{method:'DELETE',storage:true});}catch{}throw e;}
  done++;toast(`Foto ${done} de ${selected.length} salva na nuvem.`);
  }catch(e){toast('Foto não salva: '+safeErr(e));}}
- $('photoCamera').value='';$('photoFiles').value='';try{await loadPhotos(active.id);}catch(e){toast('Fotos enviadas, mas atualização da galeria falhou: '+safeErr(e));}}
+ $('photoCamera').value='';$('photoFiles').value='';try{await loadPhotos(active.id);await updateFieldState();if(staged&&!offlineMode&&navigator.onLine!==false){await syncNow();await loadPhotos(active.id);}}catch(e){toast('Galeria ou sincronização pendente: '+safeErr(e));}}
 async function downloadPhoto(id){const p=photos.find(x=>x.id===id);if(!p)return;try{const resp=await request(`object/authenticated/${bucket}/${encodePath(p.storage_path)}`,{storage:true});const blob=await resp.blob();const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=p.arquivo_nome||'foto';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);}catch(e){toast('Download falhou: '+safeErr(e));}}
 async function deletePhoto(id){const p=photos.find(x=>x.id===id);if(!p||!confirm('Excluir esta foto da nuvem permanentemente?'))return;
  try{await request(`object/${bucket}/${encodePath(p.storage_path)}`,{method:'DELETE',storage:true});await request(`ot_fotos?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});await loadPhotos(active.id);toast('Foto excluída.');}catch(e){toast('Exclusão incompleta: '+safeErr(e));}}
