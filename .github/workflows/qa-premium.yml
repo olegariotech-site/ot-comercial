@@ -21,3 +21,13 @@ jobs:
           node-version: '22'
       - name: Testar vitrine, cards e integridade de arquivos
         run: node --test tests/qa-premium.test.mjs
+      - name: Renderizar 8 cards e vitrine com Chrome real
+        run: node tests/qa-visual.mjs
+      - name: Guardar capturas para auditoria manual
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ot-v14-qa-visual
+          path: artifacts/v1-4-visual/*.png
+          if-no-files-found: warn
+          retention-days: 7
