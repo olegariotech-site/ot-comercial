@@ -149,6 +149,7 @@ window.OTOfflineVault=(()=>{
   return rows.length;
  }
  async function has(owner){ownerId(owner);return !!(await read('meta',owner))}
+ async function owners(){return (await readAll('meta')).map(meta=>meta.key).filter(id=>/^[0-9a-f-]{30,40}$/i.test(id))}
  async function get(kind,id){
   validateKind(kind);idValue(id);
   const vault=live(),key=recordKey(vault.owner,kind,id);
@@ -195,5 +196,5 @@ window.OTOfflineVault=(()=>{
  }
  async function persist(){return navigator.storage?.persist?navigator.storage.persist():false}
  async function estimate(){return navigator.storage?.estimate?navigator.storage.estimate():null}
- return {supported,has,create,unlock,lock,activeOwner,stage,stagePhoto,snapshot,get,getPhoto,list,pending,acknowledge,failed,persist,estimate,uuid:uid};
+ return {supported,has,owners,create,unlock,lock,activeOwner,stage,stagePhoto,snapshot,get,getPhoto,list,pending,acknowledge,failed,persist,estimate,uuid:uid};
 })();
