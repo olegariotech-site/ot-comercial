@@ -102,7 +102,19 @@ function showDetails(id){
  $('dcopy').onclick=()=>copyLink(sharePayload('servico',id));
  $('dwhats').href=whatsappLink(sharePayload('servico',id));
  $('dpng').onclick=async()=>{try{await window.OTCardExport.save(s);notify('Card PNG 9:16 gerado para download.')}catch(e){notify('Não foi possível gerar a imagem: '+e.message)}};
- $('dimage').onclick=async()=>{try{const result=await window.OTCardExport.share(s);if(result==='downloaded')notify('Compartilhamento de imagem indisponível: card PNG baixado.')}catch(e){notify('Não foi possível compartilhar a imagem: '+e.message)}};
+ // Pré-geração antes do toque preserva a ativação exigida pela Web Share API.
+ const imgBtn=$('dimage');imgBtn.disabled=true;imgBtn.textContent='Preparando imagem...';
+ imgBtn.dataset.service=id;let readyFile=null;
+ window.OTCardExport.create(s).then(file=>{
+  if(imgBtn.dataset.service!==id)return;
+  readyFile=file;imgBtn.disabled=false;imgBtn.textContent='Compartilhar imagem';
+ }).catch(e=>{if(imgBtn.dataset.service===id){imgBtn.textContent='Imagem indisponível';notify('Não foi possível preparar a imagem: '+e.message)}});
+ imgBtn.onclick=()=>{
+  if(!readyFile)return;
+  window.OTCardExport.shareReady(readyFile,s).then(result=>{
+   if(result==='downloaded')notify('Compartilhamento de imagem indisponível: card PNG baixado.');
+  }).catch(e=>notify('Não foi possível compartilhar a imagem: '+e.message));
+ };
  $('detalhes').showModal();
 }
 $('cards').addEventListener('click',e=>{const el=e.target.closest('[data-open],[data-share]');if(!el)return;if(el.dataset.open)showDetails(el.dataset.open);if(el.dataset.share)share('servico',el.dataset.share)});
