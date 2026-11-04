@@ -7,7 +7,7 @@ const stores=new Map(), db={objectStoreNames:{contains:x=>stores.has(x)},createO
 }};
 const indexedDB={open:()=>{const req={result:db,onsuccess:null,onupgradeneeded:null,onerror:null};queueMicrotask(()=>{req.onupgradeneeded?.();req.onsuccess?.()});return req;}};
 const window={indexedDB,crypto:webcrypto};const context=vm.createContext({window,crypto:webcrypto,indexedDB,TextEncoder,TextDecoder,Blob,Uint8Array,ArrayBuffer,atob,btoa,Promise});
-vm.runInContext(fs.readFileSync(__dirname+'/offline.js','utf8'),context);
+vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'..','offline.js'),'utf8'),context);
 const o=window.OTOffline;
 (async()=>{
  const u='00000000-0000-4000-8000-000000000001';
