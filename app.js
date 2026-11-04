@@ -182,7 +182,7 @@ async function load(){
  if(offlineMode){
   if(!fieldReady())throw Error('Cofre bloqueado');
   companies=await window.OTOfflineVault.list('company');
-  render();return;
+  render();await updateFieldState();return;
  }
  const items=await request('ot_empresas?select=*&order=created_at.desc');
  if(fieldReady())await window.OTOfflineVault.snapshot('company',items);
