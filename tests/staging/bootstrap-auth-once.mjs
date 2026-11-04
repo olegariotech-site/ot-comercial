@@ -15,7 +15,7 @@ if(config.url!=='https://efscgxwvaixwqhffwdqu.supabase.co')
 if(!config.publishableKey?.startsWith('sb_publishable_'))
  throw Error('ABORT: invalid publishable key');
 const emails=[
- 'olegariotech.oficial+otqa-20261104-a@gmail.com',
+ // Primeiro usuário já consta no Auth staging. Não reenviar cadastro dele.
  'olegariotech.oficial+otqa-20261104-b@gmail.com'
 ];
 if(process.env.OT_CREATE_TEST_USERS!=='authorized-once')
@@ -34,8 +34,9 @@ for(let index=0;index<emails.length;index++){
   console.error('QA AUTH signup '+(index+1)+' rejected: HTTP '+response.status+' '+errorType);
   process.exitCode=1;break;
  }
- if(!obj.user?.id||obj.user?.email!==emails[index])
-  throw Error('QA Auth returned no matching user for '+(index+1));
+ const returned=obj.user||obj;
+ if(!returned.id||returned.email!==emails[index])
+  throw Error('QA Auth returned no matching user (status '+response.status+', fields: '+Object.keys(obj).filter(k=>!['access_token','refresh_token'].includes(k)).join(',')+')');
  console.log('QA AUTH signup '+(index+1)+': user created (confirmation required='+
   (!obj.access_token)+')');
 }
