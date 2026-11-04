@@ -80,3 +80,17 @@ jobs:
           path: artifacts/staging-preview/
           if-no-files-found: error
           retention-days: 7
+
+  qa-auth-bootstrap:
+    if: github.ref == 'refs/heads/feat/v1-5-integracao-premium-offline' && contains(github.event.head_commit.message, '[ot-create-test-users-once]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Criar duas contas fictícias somente no staging
+        env:
+          OT_CREATE_TEST_USERS: authorized-once
+        run: node tests/staging/bootstrap-auth-once.mjs
