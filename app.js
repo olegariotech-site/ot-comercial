@@ -12,6 +12,14 @@ const offlineOwnerKey='ot_comercial_offline_owner_v1';
 function fieldReady(){return !!(userId&&window.OTOfflineVault?.activeOwner()===userId);}
 function rememberedOwner(){try{return localStorage.getItem(offlineOwnerKey)||'';}catch{return '';}}
 function rememberOwner(owner){try{localStorage.setItem(offlineOwnerKey,owner);}catch{}}
+async function findOfflineOwner(){
+ const marker=rememberedOwner();
+ try{
+  if(marker&&await window.OTOfflineVault.has(marker))return marker;
+  const list=await window.OTOfflineVault.owners();
+  return list.length===1?list[0]:'';
+ }catch{return ''}
+}
 const statusGood = new Set(['Interessado','Proposta solicitada','Em negociação']);
 const fields = ['nome','segmento','bairro','cidade','endereco','responsavel','whatsapp','presenca_digital','briefing','observacoes','status','retorno_em'];
 function show(id) { ['setupView','loginView','offlineLoginView','appView'].forEach(x=>$(x).classList.toggle('hidden', x!==id)); $('logoutBtn').hidden=id!=='appView'; }
@@ -92,7 +100,7 @@ async function handleVaultSetup(ev){
 async function unlockOffline(ev){
  ev.preventDefault();const btn=ev.submitter;btn.disabled=true;
  try{
-  const owner=rememberedOwner();
+  const owner=await findOfflineOwner();
   if(!owner||!await window.OTOfflineVault.has(owner))throw Error('Nenhum cofre offline preparado neste aparelho.');
   await window.OTOfflineVault.unlock(owner,$('offlinePassword').value);
   $('offlinePassword').value='';userId=owner;offlineMode=true;
@@ -363,7 +371,7 @@ function exportCsv(){const columns=['nome','segmento','bairro','cidade','enderec
  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ot-comercial-empresas-${dateToday()}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500);toast('CSV exportado. Fotos precisam de download separado.');}
 async function boot(){
  if(!connOk()){show('setupView');return;}
- const owner=rememberedOwner();
+ const owner=await findOfflineOwner();
  if(navigator.onLine===false&&owner){
   try{
    if(await OTOfflineVault.has(owner)){
@@ -380,7 +388,7 @@ async function boot(){
   show('appView');$('connectionState').textContent='Nuvem conectada';
   try{await load();await updateFieldState();}catch(e){toast('Falha ao buscar carteira: '+safeErr(e));}
  }else{
-  const saved=rememberedOwner();
+  const saved=await findOfflineOwner();
   if(saved&&await OTOfflineVault.has(saved)){show('offlineLoginView');}
   else show('loginView');
  }
