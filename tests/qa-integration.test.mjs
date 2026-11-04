@@ -86,3 +86,17 @@ test('Scripts JS integrados têm sintaxe válida',()=>{
   assert.doesNotThrow(()=>new vm.Script(file(name),{filename:name}));
  }
 });
+
+test('Todos os controles referenciados pelo CRM existem no HTML, e scripts estão na ordem certa',()=>{
+ const ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
+ const refs=[...app.matchAll(/\$\('([^']+)'\)/g)].map(m=>m[1]);
+ const missing=[...new Set(refs.filter(id=>!ids.has(id)))];
+ assert.deepEqual(missing,[],'IDs de controles ausentes: '+missing.join(', '));
+ assert.ok(html.indexOf('src="offline-vault.js"')<html.indexOf('src="field-sync.js"'));
+ assert.ok(html.indexOf('src="field-sync.js"')<html.indexOf('src="app.js"'));
+ assert.match(app,/async function syncNow\(\)/);
+ assert.match(app,/OTFieldSync\.sync/);
+ assert.match(app,/OTOfflineVault\.stagePhoto/);
+ assert.match(app,/OTOfflineVault\.stage\('company'/);
+ assert.match(app,/OTOfflineVault\.stage\('visit'/);
+});
