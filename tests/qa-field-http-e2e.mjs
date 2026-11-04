@@ -13,11 +13,14 @@ const out=path.join(root,'artifacts','gate-d-field');
 fs.mkdirSync(out,{recursive:true});
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function findChrome(){
- for(const cmd of [process.env.CHROME_BIN,'google-chrome','google-chrome-stable','chromium','chromium-browser'].filter(Boolean)){
-  const r=spawnSync(cmd,['--version'],{encoding:'utf8',timeout:5000});
-  if(r.status===0)return cmd;
+ for(const cmd of [process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium','/opt/google/chrome/chrome','google-chrome','google-chrome-stable',
+  'chromium','chromium-browser'].filter(Boolean)){
+  if(cmd.startsWith('/')&&fs.existsSync(cmd))return cmd;
+  const which=spawnSync('which',[cmd],{encoding:'utf8',timeout:3000});
+  if(which.status===0&&which.stdout.trim())return which.stdout.trim();
  }
- throw Error('Chromium não encontrado');
+ throw Error('Nenhum executável do Chromium localizado no runner');
 }
 const chrome=findChrome();
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'ot-field-https-'));
