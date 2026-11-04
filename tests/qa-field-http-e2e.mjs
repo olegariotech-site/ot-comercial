@@ -174,7 +174,15 @@ try{
  }
  await browser.evalJS('(()=>{document.querySelector("#offlinePassword").value='+JSON.stringify(PWD)+';document.querySelector("#offlineUnlockForm button[type=submit]").click();return true})()');
  await browser.until(isShown('appView'),'desbloquear offline',25000);
- await browser.until('document.querySelector("#pendingCount").textContent.startsWith("3 pendentes")','fila recuperada',25000);
+ try{await browser.until('document.querySelector("#pendingCount").textContent.startsWith("3 pendentes")','fila recuperada',25000);}
+ catch(e){
+  try{
+   const diag=await browser.evalJS('(async()=>({toast:document.querySelector("#toast")?.textContent,pendingLabel:document.querySelector("#pendingCount")?.textContent,fieldState:document.querySelector("#fieldState")?.textContent,online:navigator.onLine,owner:OTOfflineVault.activeOwner(),queueCount:OTOfflineVault.activeOwner()?(await OTOfflineVault.pending()).length:-1,companyCount:OTOfflineVault.activeOwner()?(await OTOfflineVault.list("company")).length:-1}))()');
+   console.log('Gate D: diagnóstico da fila após desbloqueio',JSON.stringify(diag));
+   await browser.screenshot('02-diagnostico-fila.png');
+  }catch(err){console.log('Gate D: diagnóstico de fila não disponível:',err.message)}
+  throw e;
+ }
  assert.equal(await browser.evalJS('document.querySelector("#companyList").textContent.includes("LOJA QA SEM INTERNET")'),true);
  await browser.screenshot('02-reaberto-offline.png');
  console.log('Gate D: cofre reaberto, carteira e três pendências recuperadas.');
