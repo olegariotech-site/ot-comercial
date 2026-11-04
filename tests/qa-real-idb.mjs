@@ -81,22 +81,84 @@ function ping(){return new Promise(resolve=>{
  r.on('error',()=>resolve(false));r.setTimeout(800,()=>{r.destroy();resolve(false)});
 })}
 async function ready(){for(let i=0;i<15;i++){if(await ping())return;await new Promise(r=>setTimeout(r,200))}throw Error('Servidor de testes não iniciou')}
-function runPhase(stage){
- const url=origin+'/tests/.browser-e2e/vault-e2e.html?stage='+stage;
- const r=spawnSync(chrome,['--headless=new','--no-sandbox','--disable-gpu',
-  '--disable-dev-shm-usage','--no-first-run','--disable-extensions',
-  '--disable-background-networking','--user-data-dir='+profile,
-  '--virtual-time-budget=20000','--dump-dom',url],{
-  encoding:'utf8',timeout:60000,maxBuffer:12*1024*1024
- });
- if(r.error)throw r.error;
- assert.equal(r.status,0,'Chrome falhou em '+stage+': '+(r.stderr||'').slice(-900));
- const pass=/<html[^>]+data-e2e="passed"/.test(r.stdout);
- assert.ok(pass,'Falha real no Chrome ('+stage+'): '+(r.stdout.match(/<html[^>]*data-e2e=[^>]*>/)||['sem marcador']).join('')+' | '+r.stdout.slice(-550));
- console.log('OT E2E Chromium localhost: '+stage+' passou.');
+async function runPhase(stage){
+ const chromeProcess=spawn(chrome,[
+  '--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
+  '--no-first-run','--disable-extensions','--disable-background-networking',
+  '--remote-debugging-port=0','--remote-allow-origins=*',
+  '--user-data-dir='+profile,'about:blank'
+ ],{stdio:'ignore'});
+ const wait=ms=>new Promise(r=>setTimeout(r,ms));
+ let ws;
+ try{
+  const debugFile=path.join(profile,'DevToolsActivePort');
+  let portNum=0;
+  for(let i=0;i<70;i++){
+   if(fs.existsSync(debugFile)){
+    const v=Number(fs.readFileSync(debugFile,'utf8').split('\n')[0]);
+    if(v>0){portNum=v;break}
+   }
+   await wait(100);
+  }
+  assert.ok(portNum,'DevTools não abriu');
+  let target=null;
+  for(let i=0;i<30;i++){
+   try{
+    const response=await fetch('http://127.0.0.1:'+portNum+'/json/list');
+    const tabs=await response.json();
+    target=tabs.find(tab=>tab.type==='page'&&tab.webSocketDebuggerUrl);
+    if(target)break;
+   }catch{}
+   await wait(100);
+  }
+  assert.ok(target,'Aba CDP não encontrada');
+  ws=new WebSocket(target.webSocketDebuggerUrl);
+  await new Promise((resolve,reject)=>{
+   ws.addEventListener('open',resolve,{once:true});
+   ws.addEventListener('error',()=>reject(Error('Falha de WebSocket CDP')),{once:true});
+  });
+  let seq=0;
+  const pending=new Map();
+  ws.addEventListener('message',event=>{
+   let msg;try{msg=JSON.parse(event.data)}catch{return}
+   if(!msg.id)return;
+   const p=pending.get(msg.id);if(!p)return;pending.delete(msg.id);
+   if(msg.error)p.reject(Error(msg.error.message));else p.resolve(msg.result||{});
+  });
+  const send=(method,params={})=>new Promise((resolve,reject)=>{
+   const id=++seq;pending.set(id,{resolve,reject});
+   ws.send(JSON.stringify({id,method,params}));
+  });
+  await send('Page.enable');
+  await send('Runtime.enable');
+  const url=origin+'/tests/.browser-e2e/vault-e2e.html?stage='+stage;
+  await send('Page.navigate',{url});
+  let last='';
+  for(let i=0;i<120;i++){
+   const evaluated=await send('Runtime.evaluate',{
+    expression:'[document.documentElement.dataset.e2e||"",document.body?.textContent?.slice(0,220)||""]',
+    returnByValue:true
+   });
+   const info=evaluated.result?.value||[];
+   const state=info[0]||'',message=info[1]||'';
+   if(state==='passed'){console.log('OT E2E Chrome real '+stage+': aprovado.');return;}
+   if(state==='failed')throw Error('Chrome '+stage+': '+message);
+   last=state+' '+message;
+   await wait(200);
+  }
+  throw Error('Tempo esgotado aguardando Chrome '+stage+': '+last);
+ }finally{
+  if(ws&&ws.readyState===WebSocket.OPEN)ws.close();
+  chromeProcess.kill('SIGTERM');
+  await Promise.race([
+   new Promise(resolve=>chromeProcess.once('exit',resolve)),
+   wait(2000).then(()=>{if(chromeProcess.exitCode===null)chromeProcess.kill('SIGKILL')})
+  ]);
+  await wait(250);
+ }
 }
 try{
- await ready();runPhase('create');runPhase('reopen');
+ await ready();await runPhase('create');await runPhase('reopen');
 }finally{
  server.kill('SIGTERM');
  fs.rmSync(fixturePath,{force:true});
