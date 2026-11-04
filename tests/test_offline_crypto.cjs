@@ -1,0 +1,33 @@
+const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict');
+const {webcrypto}=require('node:crypto');
+const stores=new Map(), db={objectStoreNames:{contains:x=>stores.has(x)},createObjectStore:(name)=>{stores.set(name,new Map())},close(){},transaction:(name,mode)=>{
+ const t={oncomplete:null,onerror:null,onabort:null,error:null};
+ t.objectStore=()=>({get(id){const r={result:stores.get(name).get(id),error:null,onsuccess:null,onerror:null};queueMicrotask(()=>r.onsuccess?.());return r;},getAll(){const r={result:[...stores.get(name).values()],onsuccess:null};queueMicrotask(()=>r.onsuccess?.());return r;},put(rec){stores.get(name).set(rec.id,rec);queueMicrotask(()=>t.oncomplete?.());},delete(id){stores.get(name).delete(id);queueMicrotask(()=>t.oncomplete?.());}});
+ return t;
+}};
+const indexedDB={open:()=>{const req={result:db,onsuccess:null,onupgradeneeded:null,onerror:null};queueMicrotask(()=>{req.onupgradeneeded?.();req.onsuccess?.()});return req;}};
+const window={indexedDB,crypto:webcrypto};const context=vm.createContext({window,crypto:webcrypto,indexedDB,TextEncoder,TextDecoder,Blob,Uint8Array,ArrayBuffer,atob,btoa,Promise});
+vm.runInContext(fs.readFileSync(__dirname+'/offline.js','utf8'),context);
+const o=window.OTOffline;
+(async()=>{
+ const u='00000000-0000-4000-8000-000000000001';
+ assert.equal(await o.profile(),null);
+ await o.activate(u,'FraseMuitoSegura!2026');
+ await o.save('company','e1',{id:'e1',nome:'Teste Offline'},{state:'pending-create'});
+ await o.save('visit','v1',{id:'v1',empresa_id:'e1'},{state:'pending-create'});
+ const png=new Blob([new Uint8Array([1,2,3,4,5])],{type:'image/png'});
+ await o.storeImage('f1',png);
+ await o.save('photo','f1',{id:'f1',empresa_id:'e1'},{state:'pending-create'});
+ assert.equal(await o.countPending(),3);
+ assert.equal((await o.read('company','e1')).data.nome,'Teste Offline');
+ assert.equal((await o.image('f1')).size,5);
+ o.lock();assert.equal(o.ready(),false);
+ await assert.rejects(o.unlock('frase errada'),/incorreta/);
+ await o.unlock('FraseMuitoSegura!2026');
+ assert.equal((await o.list('company')).length,1);
+ assert.equal(await o.countPending(),3);
+ await o.save('photo','f1',{id:'f1',empresa_id:'e1'},{state:'synced'});
+ await o.removeImage('f1');assert.equal(await o.countPending(),2);
+ assert.equal(await o.image('f1'),null);
+ console.log('PASS: 11 unit checks — AES-GCM, PBKDF2, wrong phrase, unlock, 3 pending, photo encrypted, idempotent local writes');
+})().catch(e=>{console.error(e);process.exitCode=1});
