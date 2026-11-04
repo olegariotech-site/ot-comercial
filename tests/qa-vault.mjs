@@ -24,7 +24,7 @@ function indexedDBMemory(){
      };
      return {
       get:key=>request(()=>structuredClone(s.get(key))),
-      getAll:()=>request(()=>Array.from(s.values(),structuredClone)),
+      getAll:()=>request(()=>Array.from(s.values(),x=>structuredClone(x))),
       put:row=>request(()=>{s.set(row.key,structuredClone(row));return row.key}),
       add:row=>request(()=>{
        if(s.has(row.key))throw Error('Duplicate key '+row.key);
