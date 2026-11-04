@@ -72,7 +72,7 @@ const FAQ=[
 const siteBase=new URL('./apresentacao-ot.html',location.href);
 const byId=id=>SERVICES.find(x=>x.id===id),byKit=id=>KITS.find(x=>x.id===id);
 const $=id=>document.getElementById(id);
-function urlFor(kind,id){const u=new URL(siteBase.href);u.searchParams.set(kind,id);return u.href}
+function urlFor(kind,id){if(kind==='servico'&&byId(id))return new URL('./solucoes/'+id+'.html',siteBase).href;const u=new URL(siteBase.href);u.searchParams.set(kind,id);return u.href}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function notify(txt){const el=$('status');el.textContent=txt;el.dataset.show='true';clearTimeout(notify.timer);notify.timer=setTimeout(()=>el.dataset.show='false',4500)}
 function sharePayload(kind,id){const s=kind==='servico'?byId(id):byKit(id);if(!s)return null;return{title:'OLEGARIO TECH | '+s.title,text:kind==='servico'?s.intro:s.text,url:urlFor(kind,id)}}
