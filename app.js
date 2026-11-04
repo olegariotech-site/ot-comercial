@@ -345,9 +345,53 @@ function exportCsv(){const columns=['nome','segmento','bairro','cidade','enderec
  const clean=v=>{const s=String(v??'');return '"'+(/^[\s]*[=+@\-\t\r]/.test(s)?"'":'')+s.replace(/"/g,'""')+'"';};
  const rows=[columns.join(';'),...companies.map(c=>columns.map(k=>clean(c[k])).join(';'))];const blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ot-comercial-empresas-${dateToday()}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500);toast('CSV exportado. Fotos precisam de download separado.');}
-async function boot(){if(!connOk()){show('setupView');return;}
- $('connectionState').textContent='Projeto configurado';if(await restore()){show('appView');$('connectionState').textContent='Nuvem conectada';try{await load();}catch(e){toast('Falha ao buscar carteira: '+safeErr(e));}}else show('loginView');}
-$('loginForm').addEventListener('submit',async ev=>{ev.preventDefault();const btn=ev.submitter;btn.disabled=true;try{await login($('email').value,$('password').value);$('password').value='';show('appView');$('connectionState').textContent='Nuvem conectada';await load();toast('Login autorizado.');}catch(e){storeSession(null);toast('Falha ao entrar: '+safeErr(e));}finally{btn.disabled=false;}});
+async function boot(){
+ if(!connOk()){show('setupView');return;}
+ const owner=rememberedOwner();
+ if(navigator.onLine===false&&owner){
+  try{
+   if(await OTOfflineVault.has(owner)){
+    try{session=JSON.parse(sessionStorage.getItem(tokenStorageKey)||'null')}catch{}
+    $('connectionState').textContent='Sem internet — cofre bloqueado';
+    show('offlineLoginView');return;
+   }
+  }catch{}
+ }
+ $('connectionState').textContent='Projeto configurado';
+ if(await restore()){
+  offlineMode=false;
+  if(OTOfflineVault.activeOwner()&&OTOfflineVault.activeOwner()!==userId)OTOfflineVault.lock();
+  show('appView');$('connectionState').textContent='Nuvem conectada';
+  try{await load();await updateFieldState();}catch(e){toast('Falha ao buscar carteira: '+safeErr(e));}
+ }else{
+  const saved=rememberedOwner();
+  if(saved&&await OTOfflineVault.has(saved)){show('offlineLoginView');}
+  else show('loginView');
+ }
+}
+$('loginForm').addEventListener('submit',async ev=>{
+ ev.preventDefault();const btn=ev.submitter;btn.disabled=true;
+ try{
+  await login($('email').value,$('password').value);$('password').value='';
+  if(OTOfflineVault.activeOwner()&&OTOfflineVault.activeOwner()!==userId)OTOfflineVault.lock();
+  offlineMode=false;show('appView');$('connectionState').textContent='Nuvem conectada';
+  await load();await updateFieldState();
+  toast('Login autorizado.');if(fieldReady())await syncNow();
+ }catch(e){storeSession(null);toast('Falha ao entrar: '+safeErr(e));}
+ finally{btn.disabled=false;}
+});
+$('offlineUnlockForm').addEventListener('submit',unlockOffline);
+$('switchOnlineBtn').addEventListener('click',()=>show('loginView'));
+$('prepareFieldBtn').addEventListener('click',()=>prepareVault().catch(e=>toast(safeErr(e))));
+$('vaultForm').addEventListener('submit',handleVaultSetup);
+$('cancelVaultBtn').addEventListener('click',()=>$('vaultDialog').close());
+$('syncPendingBtn').addEventListener('click',syncNow);
+window.addEventListener('online',()=>{
+ updateFieldState().catch(()=>{});
+ if(fieldReady()&&session?.access_token)syncNow();
+ else if(fieldReady())toast('Internet disponível. Entre na nuvem para sincronizar as pendências.');
+});
+window.addEventListener('offline',()=>{updateFieldState().catch(()=>{});});
 $('logoutBtn').addEventListener('click',logout);$('newBtn').addEventListener('click',()=>openForm());$('companyForm').addEventListener('submit',saveCompany);$('cancelCompany').addEventListener('click',()=>$('companyDialog').close());
 $('companyList').addEventListener('click',ev=>{const b=ev.target.closest('[data-id]');if(b)openCompany(b.dataset.id).catch(e=>toast('Falha ao abrir: '+safeErr(e)));});
 $('search').addEventListener('input',render);$('statusFilter').addEventListener('change',render);$('closePanel').addEventListener('click',()=>{active=null;destroyObjectUrls();$('companyPanel').classList.add('hidden');});
