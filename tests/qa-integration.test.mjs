@@ -15,12 +15,12 @@ test('Versão integrada preserva o CRM Premium e registra apenas shell público'
  assert.match(html,/offline-vault\.js/);
  assert.match(html,/offline-status\.js/);
  assert.match(html,/serviceWorker\.register\("\.\/sw\.js"\)/);
- assert.match(html,/ainda NÃO são salvos offline/);
+ assert.match(html,/Modo campo em homologação/);
  assert.match(style,/offline-notice\[hidden\]\{display:none!important\}/);
  assert.doesNotMatch(app,/OTOffline\./,'Não integrar módulo sem criptografia a dados reais');
  assert.match(store,/AES-GCM/);
  assert.match(store,/PBKDF2/);
- assert.doesNotMatch(app,/OTOfflineVault\./);
+ assert.match(app,/OTOfflineVault\./);
  assert.match(workflow,/cp sw\.js offline-vault\.js offline-status\.js manifest\.webmanifest ot-icon\.svg _site\//);
  assert.match(workflow,/branches:\s*\[main\]/,'Nenhum deploy automático a partir desta branch');
  assert.equal(manifest.scope,'./');
