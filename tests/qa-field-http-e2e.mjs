@@ -89,7 +89,8 @@ async function launch(offline=false){
   if(offline)await send('Network.emulateNetworkConditions',{
    offline:true,latency:0,downloadThroughput:0,uploadThroughput:0
   });
-  await send('Page.navigate',{url:mock.origin+'/index.html'});
+  const navigation=await send('Page.navigate',{url:mock.origin+'/index.html'});
+  if(navigation.errorText)console.log('Gate D: retorno da navegação',navigation.errorText);
   async function evalJS(js){
    const r=await Promise.race([
     send('Runtime.evaluate',{expression:js,returnByValue:true,awaitPromise:true,userGesture:true}),
@@ -162,7 +163,15 @@ try{
  console.log('Gate D: empresa, visita e foto fictícias persistidas com rede desligada.');
  await browser.close();browser=null;
  browser=await launch(true);
- await browser.until(isShown('offlineLoginView'),'reabrir sem internet',25000);
+ try{await browser.until(isShown('offlineLoginView'),'reabrir sem internet',25000);}
+ catch(e){
+  try{
+   const diag=await browser.evalJS('({url:location.href,ready:document.readyState,online:navigator.onLine,offlineHidden:document.querySelector("#offlineLoginView")?.classList.contains("hidden"),loginHidden:document.querySelector("#loginView")?.classList.contains("hidden"),setupHidden:document.querySelector("#setupView")?.classList.contains("hidden"),owner:localStorage.getItem("ot_comercial_offline_owner_v1"),message:document.querySelector("#toast")?.textContent,body:document.body?.innerText.slice(0,250)})');
+   console.log('Gate D: diagnóstico de reabertura offline',JSON.stringify(diag));
+   await browser.screenshot('02-diagnostico-reabertura.png');
+  }catch(err){console.log('Gate D: falha ao capturar diagnóstico',err.message)}
+  throw e;
+ }
  await browser.evalJS('(()=>{document.querySelector("#offlinePassword").value='+JSON.stringify(PWD)+';document.querySelector("#offlineUnlockForm button[type=submit]").click();return true})()');
  await browser.until(isShown('appView'),'desbloquear offline',25000);
  await browser.until('document.querySelector("#pendingCount").textContent.startsWith("3 pendentes")','fila recuperada',25000);
