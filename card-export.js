@@ -1,7 +1,7 @@
 'use strict';
 /* Exportação local de card OT 1080x1920 (9:16).
  * Não contém dados do CRM, nem carrega fontes/imagens externas.
- * Não substitui o logotipo oficial: somente wordmark tipográfico.
+ * O logotipo oficial é carregado da cópia original via ot-logo.js.
  */
 window.OTCardExport=(()=>{
  const WIDTH=1080,HEIGHT=1920;
@@ -37,7 +37,19 @@ window.OTCardExport=(()=>{
   const bg=ctx.createLinearGradient(0,0,WIDTH,HEIGHT);bg.addColorStop(0,'#081320');bg.addColorStop(.55,'#19294A');bg.addColorStop(1,'#211538');ctx.fillStyle=bg;ctx.fillRect(0,0,WIDTH,HEIGHT);
   const blue=ctx.createRadialGradient(970,360,40,970,360,900);blue.addColorStop(0,'#285E9Baa');blue.addColorStop(1,'#285E9B00');ctx.fillStyle=blue;ctx.fillRect(0,0,WIDTH,HEIGHT);
   const purple=ctx.createRadialGradient(30,1460,0,30,1460,760);purple.addColorStop(0,'#6440A666');purple.addColorStop(1,'#6440A600');ctx.fillStyle=purple;ctx.fillRect(0,700,WIDTH,HEIGHT-700);
-  ctx.strokeStyle='#82cfff21';ctx.lineWidth=2;for(let x=82;x<WIDTH;x+=74){for(let y=160;y<HEIGHT;y+=74){ctx.beginPath();ctx.arc(x,y,1.5,0,Math.PI*2);ctx.stroke()}}
+  // Premium Clean: textura de partículas somente na periferia, sem competir com textos.
+  // Antes: grade de ~300 pontos em toda a peça; agora: ~25 pontos discretos nas bordas.
+  ctx.save();
+  ctx.fillStyle='rgba(130,204,255,0.085)';
+  for(let y=350;y<=1620;y+=135){
+   for(const x of [43,1038]){
+    ctx.beginPath();ctx.arc(x,y,1.15,0,Math.PI*2);ctx.fill();
+   }
+  }
+  // Pequena constelação superior direita, fora das áreas de título e benefício.
+  ctx.fillStyle='rgba(130,204,255,0.055)';
+  for(const x of [832,924,1016]){ctx.beginPath();ctx.arc(x,376,1.05,0,Math.PI*2);ctx.fill();}
+  ctx.restore();
   ctx.fillStyle='#8EDEFF';ctx.fillRect(90,135,90,7);
   if(logo){ctx.save();rectangle(ctx,832,130,160,160,20);ctx.clip();ctx.drawImage(logo,832,130,160,160);ctx.restore();}
   ctx.fillStyle=color.white;ctx.font='800 43px system-ui, sans-serif';ctx.fillText('OLEGARIO TECH',90,235);
