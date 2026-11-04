@@ -7,7 +7,7 @@ on:
     branches: [feat/v1-4-vitrine-premium, feat/v1-5-integracao-premium-offline]
 
 concurrency:
-  group: ot-premium-${{ github.ref }}
+  group: ot-field-gate-d-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -37,5 +37,24 @@ jobs:
         with:
           name: ot-v14-qa-visual
           path: artifacts/v1-4-visual/*.png
+          if-no-files-found: warn
+          retention-days: 7
+
+  field-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Gate D — ensaio completo em HTTPS mock sem produção
+        run: node tests/qa-field-http-e2e.mjs
+      - name: Arquivar imagens fictícias do campo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ot-v15-gate-d-campo
+          path: artifacts/gate-d-field/*.png
           if-no-files-found: warn
           retention-days: 7
