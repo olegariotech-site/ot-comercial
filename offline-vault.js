@@ -76,6 +76,8 @@ window.OTOfflineVault=(()=>{
   unlocked={owner,key};return true;
  }
  async function unlock(owner,passphrase){
+  // Nunca manter acesso ao cofre anterior após tentativa de troca de usuário.
+  unlocked=null;
   ownerId(owner);
   const meta=await read('meta',owner);if(!meta)throw Error('Cofre não encontrado neste aparelho');
   const key=await derive(passphrase,meta.salt);
@@ -123,6 +125,30 @@ window.OTOfflineVault=(()=>{
   });
   return {id,opId,storedLocally:true};
  }
+ // Cache criptografado de fichas já vistas online, SEM enfileirar reenvio.
+ // Não sobrescreve registros com operações locais pendentes.
+ async function snapshot(kind,records){
+  validateKind(kind);
+  if(!Array.isArray(records)||records.length>5000)throw Error('Lote de cache inválido');
+  const vault=live(),owner=vault.owner;
+  const dirty=new Set((await pending()).filter(p=>p.kind===kind).map(p=>p.payload?.id));
+  const rows=[];
+  for(const record of records){
+   if(!record?.id||dirty.has(record.id))continue;
+   const id=idValue(record.id),key=recordKey(owner,kind,id);
+   const box=await seal(jsonBytes(record),vault.key,'record:'+key);
+   rows.push({key,owner,kind,box,updatedAt:Date.now()});
+  }
+  if(unlocked!==vault)throw Error('Cofre bloqueado antes de salvar cache');
+  if(!rows.length)return 0;
+  await operation(['records'],'readwrite',tx=>{
+   const store=tx.objectStore('records');
+   let last;for(const row of rows)last=store.put(row);
+   return last;
+  });
+  return rows.length;
+ }
+ async function has(owner){ownerId(owner);return !!(await read('meta',owner))}
  async function get(kind,id){
   validateKind(kind);idValue(id);
   const vault=live(),key=recordKey(vault.owner,kind,id);
@@ -169,5 +195,5 @@ window.OTOfflineVault=(()=>{
  }
  async function persist(){return navigator.storage?.persist?navigator.storage.persist():false}
  async function estimate(){return navigator.storage?.estimate?navigator.storage.estimate():null}
- return {supported,create,unlock,lock,activeOwner,stage,stagePhoto,get,getPhoto,list,pending,acknowledge,failed,persist,estimate,uuid:uid};
+ return {supported,has,create,unlock,lock,activeOwner,stage,stagePhoto,snapshot,get,getPhoto,list,pending,acknowledge,failed,persist,estimate,uuid:uid};
 })();
