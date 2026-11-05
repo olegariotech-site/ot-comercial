@@ -18,7 +18,7 @@ assert.doesNotMatch(app,/ot_comercial_v12_sessao|ot_comercial_offline_owner_v1/)
 assert.match(vault,/ot-comercial-QA-encrypted-vault-v15/);
 assert.doesNotMatch(vault,/ot-comercial-encrypted-vault-v1/);
 assert.match(worker,/ot-comercial-QA-shell-/);
-assert.match(worker,/v1-5-staging-v2/);
+assert.match(worker,/v1-5-staging-v3/);
 assert.doesNotMatch(worker,/ot-comercial-shell-|ot-comercial-v13-shell-/);
 assert.match(html,/AMBIENTE DE HOMOLOGAÇÃO/);
 assert.match(html,/noindex,nofollow,noarchive/);
