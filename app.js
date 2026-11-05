@@ -271,7 +271,7 @@ async function openCompany(id){active=companies.find(c=>c.id===id);if(!active)re
  $('companyPanel').classList.remove('hidden');$('panelTitle').textContent=active.nome;
  $('panelInfo').textContent=`${active.bairro||'Bairro não informado'} · ${active.endereco||'Endereço não informado'} · ${active.responsavel||'Responsável não informado'} · ${active.whatsapp||'Sem WhatsApp'} · ${active.status}`;
  $('panelBriefing').textContent=active.briefing||'Sem briefing';$('panelNotes').textContent=active.observacoes||'Sem observações';
- $('visitForm').reset();$('photoConsent').checked=false;
+ $('visitForm').reset();$('photoConsent').checked=false;$('photoCacheState').textContent='Use Preparar fotos offline para confirmar toda a galeria.';
  await Promise.all([loadVisits(id),loadPhotos(id)]);$('companyPanel').scrollIntoView({behavior:'smooth',block:'start'});}
 async function loadVisits(id){
  let remote=[];
@@ -377,6 +377,54 @@ async function loadPhotos(id){
    if(label)label.textContent=' · FOTO INDISPONÍVEL';
   }
  }
+}
+// Ação explícita para preparar a galeria inteira antes de sair para o campo.
+// Verifica cada imagem cifrada; não cria novos uploads nem altera registros remotos.
+async function preparePhotoGalleryOffline(){
+ if(!active)return;
+ const btn=$('preparePhotoOfflineBtn'),output=$('photoCacheState'),companyId=active.id;
+ if(!fieldReady()||offlineMode||navigator.onLine===false){
+  output.textContent='Conecte a nuvem e desbloqueie o cofre para preparar as fotos.';
+  return;
+ }
+ btn.disabled=true;
+ output.textContent='Conferindo fotografias no cofre...';
+ try{
+  const cloud=await request('ot_fotos?select=*&empresa_id=eq.'+encodeURIComponent(companyId)+'&order=created_at.desc');
+  if(!Array.isArray(cloud))throw Error('Resposta inesperada da galeria');
+  let ready=0;const failures=[];
+  for(const [index,p] of cloud.entries()){
+   if(active?.id!==companyId)throw Error('A empresa foi alterada durante a preparação');
+   if(!fieldReady())throw Error('Cofre bloqueado durante a preparação');
+   try{
+    let saved;
+    try{saved=await OTOfflineVault.getPhoto(p.id)}catch{}
+    if(!saved?.blob?.size||saved.blob.size!==Number(p.bytes)){
+     if(!p.storage_path)throw Error('Arquivo sem caminho na nuvem');
+     const resp=await request('object/authenticated/'+bucket+'/'+encodePath(p.storage_path),{storage:true});
+     const blob=await resp.blob();
+     const result=await OTOfflineVault.cachePhoto(p,blob);
+     if(!result.cached)throw Error('Foto ainda pendente, não pode ser substituída');
+     saved=await OTOfflineVault.getPhoto(p.id);
+    }
+    if(!saved?.blob||saved.blob.size!==Number(p.bytes))
+     throw Error('Imagem não confirmada após gravar no cofre');
+    ready++;
+   }catch(e){failures.push('Foto '+(index+1)+': '+safeErr(e));}
+   output.textContent=ready+' de '+cloud.length+' fotos confirmadas no cofre...';
+  }
+  if(active?.id===companyId)await loadPhotos(companyId);
+  if(failures.length){
+   output.textContent=ready+' de '+cloud.length+' fotos offline. Falhou: '+failures.join(' | ');
+   toast('Galeria offline incompleta: '+ready+'/'+cloud.length+'. Confira o motivo na seção da galeria.');
+  }else{
+   output.textContent=ready+' de '+cloud.length+' fotos disponíveis offline — confirmado.';
+   toast('Galeria preparada: '+ready+' de '+cloud.length+' fotos no cofre.');
+  }
+ }catch(e){
+  output.textContent='Preparação não concluída: '+safeErr(e);
+  toast('Galeria não preparada: '+safeErr(e));
+ }finally{btn.disabled=false;}
 }
 function renderPhotoCards(){
  $('photoList').innerHTML=photos.map(p=>'<article class="photo-card"><img id="img-'+
@@ -498,6 +546,6 @@ window.addEventListener('offline',()=>{updateFieldState().catch(()=>{});});
 $('logoutBtn').addEventListener('click',logout);$('newBtn').addEventListener('click',()=>openForm());$('companyForm').addEventListener('submit',saveCompany);$('cancelCompany').addEventListener('click',()=>$('companyDialog').close());
 $('companyList').addEventListener('click',ev=>{const b=ev.target.closest('[data-id]');if(b)openCompany(b.dataset.id).catch(e=>toast('Falha ao abrir: '+safeErr(e)));});
 $('search').addEventListener('input',render);$('statusFilter').addEventListener('change',render);$('closePanel').addEventListener('click',()=>{active=null;destroyObjectUrls();$('companyPanel').classList.add('hidden');});
-$('editBtn').addEventListener('click',()=>active&&openForm(active));$('deleteCompanyBtn').addEventListener('click',deleteCompany);$('visitForm').addEventListener('submit',saveVisit);$('photoFiles').addEventListener('change',ev=>uploadPhotos(ev.target.files));$('photoCamera').addEventListener('change',ev=>uploadPhotos(ev.target.files));
+$('editBtn').addEventListener('click',()=>active&&openForm(active));$('deleteCompanyBtn').addEventListener('click',deleteCompany);$('visitForm').addEventListener('submit',saveVisit);$('photoFiles').addEventListener('change',ev=>uploadPhotos(ev.target.files));$('photoCamera').addEventListener('change',ev=>uploadPhotos(ev.target.files));$('preparePhotoOfflineBtn').addEventListener('click',preparePhotoGalleryOffline);
 $('photoList').addEventListener('click',ev=>{const d=ev.target.closest('[data-download]'),x=ev.target.closest('[data-delete-photo]');if(d)downloadPhoto(d.dataset.download);if(x)deletePhoto(x.dataset.deletePhoto);});$('exportBtn').addEventListener('click',exportCsv);
 boot();
