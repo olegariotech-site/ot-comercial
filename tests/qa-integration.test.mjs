@@ -65,7 +65,50 @@ test('Worker não intercepta Supabase e só cacheia arquivos públicos dentro do
  assert.equal(promise.length,1);const fetched=await promise[0];assert.equal(fetched.ok,true);
  const cachePath=[];
  listeners.fetch({request:{method:'GET',url:'https://olegariotech-site.github.io/ot-comercial/app.js',mode:'cors'},respondWith(p){cachePath.push(p)}});
- assert.equal(cachePath.length,1);assert.deepEqual(await cachePath[0],cachedResponse);
+ assert.equal(cachePath.length,1);assert.strictEqual(await cachePath[0],sampleResponse,'A rede deve ter prioridade sobre JS antigo');
+});
+
+test('Atualizacao PWA: JS novo pela rede, fallback antigo so quando offline',async()=>{
+ const listeners={},puts=[];
+ const old={ok:true,version:'antiga',clone(){return this}};
+ const fresh={ok:true,version:'nova',clone(){return this}};
+ const unavailable={ok:false,status:503};
+ let situation='online';
+ const cache={
+  addAll:async()=>{},
+  match:async()=>old,
+  put:async(req,response)=>puts.push({path:req.url,version:response.version})
+ };
+ const scope='https://olegariotech-site.github.io/ot-comercial/';
+ const self={
+  registration:{scope},
+  location:{origin:'https://olegariotech-site.github.io'},
+  addEventListener(name,handler){listeners[name]=handler},
+  skipWaiting:async()=>{},
+  clients:{claim:async()=>{}}
+ };
+ const caches={open:async()=>cache,keys:async()=>[],delete:async()=>true};
+ const fetch=async()=>{
+  if(situation==='offline')throw Error('sem rede');
+  return situation==='server-error'?unavailable:fresh;
+ };
+ vm.runInNewContext(sw,{self,caches,URL,fetch,Error});
+ const req={url:scope+'app.js',method:'GET',mode:'cors'};
+ const attempt=()=>{
+  let response;
+  listeners.fetch({request:req,respondWith(p){response=p}});
+  assert.ok(response,'O SW deve interceptar somente arquivo publico no escopo');
+  return response;
+ };
+ assert.strictEqual(await attempt(),fresh);
+ assert.equal(puts.length,1);
+ assert.equal(puts[0].version,'nova');
+ situation='offline';
+ assert.strictEqual(await attempt(),old,'Offline deve manter a copia disponivel');
+ assert.equal(puts.length,1,'Nao alterar cache durante falha de rede');
+ situation='server-error';
+ assert.strictEqual(await attempt(),unavailable,'Nao esconder erro HTTP com JS velho');
+ assert.equal(puts.length,1,'Nao cachear falhas HTTP');
 });
 
 test('Aviso offline aparece e não afirma que dados foram sincronizados',()=>{
