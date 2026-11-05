@@ -67,9 +67,25 @@ async function updateFieldState(){
   count.textContent='Pendências não consultadas';button.disabled=true;return;
  }
  const p=await window.OTOfflineVault.pending();
- label.textContent=(offlineMode?'Trabalhando com dados criptografados no aparelho':'Cofre desbloqueado — pronto para o campo')+(lastSyncIssue?' · Falha de sincronização: '+lastSyncIssue:'');
+ const offlineVisits=(await window.OTOfflineVault.list('visit')).length;
+ label.textContent=(offlineMode?'Trabalhando com dados criptografados no aparelho':'Cofre desbloqueado — pronto para o campo')+' · '+offlineVisits+' visita'+(offlineVisits===1?'':'s')+' no cofre'+(lastSyncIssue?' · Falha de sincronização: '+lastSyncIssue:'');
  count.textContent=p.length+' pendente'+(p.length===1?'':'s');
  button.disabled=syncBusy||!p.length||navigator.onLine===false;
+}
+// Pré-carrega visitas existentes ao preparar o cofre, inclusive quando a ficha
+// foi aberta antes do desbloqueio. Confirmar criptografia ANTES de anunciar sucesso.
+// Limite deliberado de 200 recentes: avisar quando a carteira exige paginação.
+async function cacheHistoryForField(){
+ if(!fieldReady()||offlineMode||navigator.onLine===false)return {checked:false,count:0,partial:false};
+ const rows=await request('ot_visitas?select=*&order=realizado_em.desc&limit=201');
+ if(!Array.isArray(rows))throw Error('Resposta inválida para histórico');
+ const partial=rows.length>200, selected=rows.slice(0,200);
+ if(selected.length)await window.OTOfflineVault.snapshot('visit',selected);
+ const stored=await window.OTOfflineVault.list('visit');
+ const ids=new Set(stored.map(v=>v.id));
+ const missing=selected.filter(v=>!ids.has(v.id));
+ if(missing.length)throw Error('Não foi possível confirmar '+missing.length+' visitas no cofre deste aparelho');
+ return {checked:true,count:selected.length,partial};
 }
 async function prepareVault(){
  if(!userId||offlineMode){toast('Entre na nuvem para preparar seu dispositivo.');return}
@@ -92,7 +108,12 @@ async function handleVaultSetup(ev){
   $('vaultPassword').value='';$('vaultDialog').close();
   rememberOwner(userId);
   await window.OTOfflineVault.persist();
-  await load();toast('Cofre local desbloqueado. Fichas consultadas ficam protegidas no aparelho.');
+  await load();
+  try{
+   const history=await cacheHistoryForField();
+   if(history.checked)toast(history.count+' visita'+(history.count===1?'':'s')+' confirmada'+(history.count===1?'':'s')+' no cofre'+(history.partial?' (somente 200 mais recentes; histórico parcial)':'')+'.');
+   else toast('Cofre desbloqueado. Histórico offline não verificado.');
+  }catch(e){toast('Cofre desbloqueado, mas histórico offline NÃO confirmado: '+safeErr(e));}
   await updateFieldState();
  }catch(e){toast('Cofre não ativado: '+safeErr(e));}
  finally{btn.disabled=false;}
@@ -255,9 +276,15 @@ async function openCompany(id){active=companies.find(c=>c.id===id);if(!active)re
 async function loadVisits(id){
  let remote=[];
  if(!offlineMode&&navigator.onLine!==false){
-  try{remote=await request('ot_visitas?select=*&empresa_id=eq.'+encodeURIComponent(id)+'&order=realizado_em.desc&limit=50');
-   if(fieldReady())await OTOfflineVault.snapshot('visit',remote);
-  }catch(e){if(!fieldReady())throw e;toast('Histórico na nuvem indisponível; mostrando cópia protegida.');}
+  try{remote=await request('ot_visitas?select=*&empresa_id=eq.'+encodeURIComponent(id)+'&order=realizado_em.desc&limit=50');}
+  catch(e){if(!fieldReady())throw e;toast('Histórico na nuvem indisponível; mostrando cópia protegida.');}
+  if(fieldReady()&&remote.length){
+   try{
+    await OTOfflineVault.snapshot('visit',remote);
+    const ids=new Set((await OTOfflineVault.list('visit')).map(v=>v.id));
+    if(remote.some(v=>!ids.has(v.id)))throw Error('Visitas não foram confirmadas no cofre');
+   }catch(e){toast('Histórico online visível, mas cópia offline NÃO confirmada: '+safeErr(e));}
+  }
  }
  const local=fieldReady()?(await OTOfflineVault.list('visit')).filter(v=>v.empresa_id===id):[];
  const merged=new Map(remote.map(row=>[row.id,row]));
