@@ -150,7 +150,7 @@ try{
  const day=await browser.evalJS('OTCommercial.today()');const shift=n=>{const d=new Date(day+'T12:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
  for(let i=0;i<10;i++){
   const started=Date.now();await browser.evalJS('document.querySelector("#quickNewBtn").click();true');await browser.until('document.querySelector("#quickDialog").open','cadastro rápido '+i);
-  await form('quickForm',{nome:'QA V16 '+i,segmento:i===0?'Alimentação':'Serviços',decisor:'Decisor fictício',necessidade:'Diagnóstico de presença digital',proxima:i===3?'':'Apresentar diagnóstico '+i,data:i===1?shift(-1):i===2?shift(1):day});
+  await form('quickForm',{nome:'QA V16 '+i,segmento:i===0?'Alimentação':'Serviços',decisor:'Decisor fictício',necessidade:i===9?'Necessidade inicial detalhada de QA '.repeat(6):'Diagnóstico de presença digital',proxima:i===3?'':'Apresentar diagnóstico '+i,data:i===1?shift(-1):i===2?shift(1):day});
   await idle('quickDialog');timings.push(Date.now()-started);
  }
  assert.equal(mock.map.ot_empresas.size,10);assert.ok(timings.filter(ms=>ms<=90000).length>=8);assert.equal(await browser.evalJS('document.querySelectorAll("[data-agenda-row]").length'),10);

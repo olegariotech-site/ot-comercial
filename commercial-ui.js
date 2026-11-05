@@ -89,7 +89,7 @@ window.OTCommercialUI=(()=>{
   ev.preventDefault();const button=ev.submitter;button.disabled=true;
   try{
    requireVault();const f=q('quickForm'),get=n=>formValue(f,n),name=get('nome');if(name.length<2)throw Error('Informe pelo menos 2 caracteres no nome');
-   const companyId=crypto.randomUUID(),o=c.make('opportunity',companyId,{titulo:get('necessidade')||'Diagnóstico inicial',necessidade:get('necessidade'),decisor:get('decisor'),contato:get('contato'),papel_contato:get('papel_contato'),melhor_horario:get('melhor_horario')});
+   const companyId=crypto.randomUUID(),o=c.make('opportunity',companyId,{titulo:get('necessidade').slice(0,150)||'Diagnóstico inicial',necessidade:get('necessidade'),decisor:get('decisor'),contato:get('contato'),papel_contato:get('papel_contato'),melhor_horario:get('melhor_horario')});
    const entries=[{kind:'company',record:{id:companyId,nome:name,segmento:get('segmento'),responsavel:get('decisor'),whatsapp:get('contato'),briefing:'',observacoes:'',status:get('status'),cidade:'Valinhos',bairro:'',endereco:'',presenca_digital:'',retorno_em:null}},{kind:'commercial',record:o}];
    if(get('proxima'))entries.push({kind:'commercial',record:c.make('action',companyId,{oportunidade_id:o.entity_id,descricao:get('proxima'),data_prevista:get('data')})});
    await save(entries);q('quickDialog').close();f.reset();setView('agenda');render();notify('Prospecção preservada. Próximo passo disponível na agenda.');
