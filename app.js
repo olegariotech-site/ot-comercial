@@ -7,7 +7,7 @@ const cfg = window.OT_CONFIG || {};
 const bucket = 'ot-clientes-privado';
 const tokenStorageKey = 'ot_comercial_v12_sessao';
 let session = null, userId = null, companies = [], active = null, photos = [], objectUrls = [];
-let offlineMode=false, syncBusy=false;
+let offlineMode=false, syncBusy=false, lastSyncIssue='';
 const offlineOwnerKey='ot_comercial_offline_owner_v1';
 function fieldReady(){return !!(userId&&window.OTOfflineVault?.activeOwner()===userId);}
 function rememberedOwner(){try{return localStorage.getItem(offlineOwnerKey)||'';}catch{return '';}}
@@ -67,7 +67,7 @@ async function updateFieldState(){
   count.textContent='Pendências não consultadas';button.disabled=true;return;
  }
  const p=await window.OTOfflineVault.pending();
- label.textContent=offlineMode?'Trabalhando com dados criptografados no aparelho':'Cofre desbloqueado — pronto para o campo';
+ label.textContent=(offlineMode?'Trabalhando com dados criptografados no aparelho':'Cofre desbloqueado — pronto para o campo')+(lastSyncIssue?' · Falha de sincronização: '+lastSyncIssue:'');
  count.textContent=p.length+' pendente'+(p.length===1?'':'s');
  button.disabled=syncBusy||!p.length||navigator.onLine===false;
 }
@@ -121,36 +121,50 @@ function cloudApi(owner){
   }),
   ensurePhoto:async(path,blob)=>{
    const url=base+'/storage/v1/object/'+bucket+'/'+encodePath(path);
-   const readExisting=async(retry=true)=>{
+   const download=async(retry=true)=>{
     await authenticated();
-    let resp;
-    try{resp=await fetch(base+'/storage/v1/object/authenticated/'+bucket+'/'+encodePath(path),{
+    let res;
+    try{res=await fetch(base+'/storage/v1/object/authenticated/'+bucket+'/'+encodePath(path),{
      headers:headers(true)
-    });}catch{throw Error('Falha de conexão ao conferir a fotografia.');}
-    if(resp.status===401&&retry){await refreshSession();return readExisting(false)}
-    if(resp.status===404)return null;
-    if(!resp.ok)throw Error('Não foi possível conferir fotografia na nuvem (HTTP '+resp.status+').');
-    return resp.blob();
+    })}catch{throw Error('Não foi possível conferir a foto na nuvem (sem conexão).')}
+    if(res.status===401&&retry){await refreshSession();return download(false)}
+    if(!res.ok)throw Error('Não foi possível conferir a foto enviada (HTTP '+res.status+').');
+    return res.blob();
    };
-   const fingerprint=async b=>{
-    const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',await b.arrayBuffer()));
+   const sha=async file=>{
+    const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',await file.arrayBuffer()));
     return [...bytes].map(x=>x.toString(16).padStart(2,'0')).join('');
    };
-   const verify=async existing=>{
-    if(!existing)return false;
-    if(existing.size!==blob.size||await fingerprint(existing)!==await fingerprint(blob))
-     throw Error('Conflito: o arquivo remoto é diferente do arquivo local.');
-    return true;
+   const verify=async()=>{
+    const remote=await download();
+    if(remote.size!==blob.size||(await sha(remote))!==(await sha(blob)))
+     throw Error('Conflito: existe outra foto nesse caminho da nuvem. A cópia local foi preservada.');
    };
-   if(await verify(await readExisting()))return;
-   await authenticated();let resp;
-   try{resp=await fetch(url,{method:'POST',headers:{...headers(true),'Content-Type':blob.type,
-    'x-upsert':'false'},body:blob})}catch{throw Error('Envio interrompido; foto mantida no cofre.');}
-   if(!resp.ok){
-    if(resp.status===409&&await verify(await readExisting()))return;
-    throw Error('Upload não concluído (HTTP '+resp.status+').');
+   // POST PRIMEIRO: o arquivo ainda não existe, portanto um GET prévio pode
+   // retornar 400/404 de formas diferentes conforme a versão do Storage.
+   // O caminho é determinístico, e não usamos upsert: jamais sobrescrever foto.
+   await authenticated();
+   let res;
+   try{res=await fetch(url,{method:'POST',headers:{
+    ...headers(true),'Content-Type':blob.type
+   },body:blob})}catch{throw Error('Envio da foto interrompido. Cópia local preservada.')}
+   if(!res.ok){
+    const status=res.status;
+    let details={};
+    try{details=await res.json()}catch{}
+    const code=String(details.code||details.error||'');
+    const message=String(details.message||'').slice(0,150);
+    const duplicate=[400,409].includes(status)&&(
+     /^(ResourceAlreadyExists|KeyAlreadyExists|Duplicate|already_exists)$/i.test(code)||
+     /already exists|already_exist|duplicate|já existe/i.test(message)
+    );
+    if(!duplicate)throw Error('Upload da foto: HTTP '+status+(message?' — '+message:'')+
+     (code?' ['+code+']':''));
+    // O upload anterior pode ter concluído antes de perder a resposta.
+    // Somente SHA-256 idêntico confirma que podemos continuar sem reenviar.
+    await verify();return;
    }
-   if(!await verify(await readExisting()))throw Error('Servidor ainda não confirmou o arquivo.');
+   await verify();
   }
  };
 }
@@ -172,8 +186,15 @@ async function syncNow(){
   const summary=await window.OTFieldSync.sync({vault:window.OTOfflineVault,api:cloudApi(userId),
    owner:userId,online:()=>navigator.onLine!==false});
   if(summary.failed){
-   toast(summary.synced+' sincronizados; '+summary.pending+' pendentes. Nenhum registro local foi descartado.');
-  }else if(summary.synced){toast(summary.synced+' registros confirmados na nuvem.');}
+   const error=summary.errors?.[0];
+   lastSyncIssue=((error?.kind==='photo'?'Foto: ':error?.kind==='visit'?'Visita: ':'Empresa: ')+
+    String(error?.message||'erro desconhecido')).slice(0,180);
+   toast(summary.synced+' sincronizados; '+summary.pending+
+    ' pendentes. '+lastSyncIssue+' — registro local preservado.');
+  }else{
+   lastSyncIssue='';
+   if(summary.synced)toast(summary.synced+' registros confirmados na nuvem.');
+  }
   if(!offlineMode)await load();
  }catch(e){toast('Sincronização não concluída: '+safeErr(e));}
  finally{syncBusy=false;await updateFieldState();}
