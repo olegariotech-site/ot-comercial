@@ -125,6 +125,36 @@ window.OTOfflineVault=(()=>{
   });
   return {id,opId,storedLocally:true};
  }
+ // Cópia cifrada da foto já existente na nuvem; NUNCA cria fila de upload.
+ async function cachePhoto(info,file){
+  const vault=live(),owner=vault.owner;
+  if(!info||typeof info!=='object')throw Error('Metadados inválidos');
+  const id=idValue(info.id),company=idValue(info.empresa_id),path=String(info.storage_path||'');
+  if(!path.startsWith(owner+'/'+company+'/'+id+'.'))throw Error('Foto de outro proprietário');
+  if(!(file instanceof Blob)||!file.size||file.size>6*1024*1024)
+   throw Error('Foto inválida ou acima de 6 MB');
+  if(Number(info.bytes)!==file.size)throw Error('Tamanho da foto diferente do registrado');
+  const extension=path.split('.').pop().toLowerCase();
+  const types={jpg:'image/jpeg',png:'image/png',webp:'image/webp'};
+  const mime=types[extension];
+  if(!mime||(file.type&&file.type!=='application/octet-stream'&&file.type!==mime))
+   throw Error('Formato de imagem inválido');
+  if((await pending()).some(p=>p.kind==='photo'&&p.payload?.id===id))
+   return {cached:false,skippedPending:true};
+  const rec=recordKey(owner,'photo',id),bkey=blobKey(owner,id);
+  if(await read('records',rec)&&await read('blobs',bkey))
+   return {cached:true,existing:true};
+  const [recordBox,photoBox]=await Promise.all([
+   seal(jsonBytes({...info,mime,bytes:file.size}),vault.key,'record:'+rec),
+   seal(await file.arrayBuffer(),vault.key,'photo:'+bkey)
+  ]);
+  if(unlocked!==vault)throw Error('Cofre bloqueado antes de salvar a imagem');
+  await operation(['records','blobs'],'readwrite',tx=>{
+   tx.objectStore('records').put({key:rec,owner,kind:'photo',box:recordBox,updatedAt:Date.now()});
+   tx.objectStore('blobs').put({key:bkey,owner,box:photoBox});
+  });
+  return {cached:true,existing:false};
+ }
  // Cache criptografado de fichas já vistas online, SEM enfileirar reenvio.
  // Não sobrescreve registros com operações locais pendentes.
  async function snapshot(kind,records){
@@ -196,5 +226,5 @@ window.OTOfflineVault=(()=>{
  }
  async function persist(){return navigator.storage?.persist?navigator.storage.persist():false}
  async function estimate(){return navigator.storage?.estimate?navigator.storage.estimate():null}
- return {supported,has,owners,create,unlock,lock,activeOwner,stage,stagePhoto,snapshot,get,getPhoto,list,pending,acknowledge,failed,persist,estimate,uuid:uid};
+ return {supported,has,owners,create,unlock,lock,activeOwner,stage,stagePhoto,cachePhoto,snapshot,get,getPhoto,list,pending,acknowledge,failed,persist,estimate,uuid:uid};
 })();
