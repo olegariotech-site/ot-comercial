@@ -33,12 +33,19 @@ self.addEventListener('fetch',event=>{
  event.respondWith((async()=>{
   const cache=await caches.open(CACHE);
   const cached=await cache.match(req,{ignoreSearch:true});
-  // Primeiro tenta atualizar os documentos, retornando ao cache quando offline.
-  if(req.mode==='navigate'){
-   try{const online=await fetch(req);if(online.ok)await cache.put(req,online.clone());return online}
-   catch{if(cached)return cached;throw Error('Página indisponível offline')}
+  // Shell público: preferir SEMPRE a versão da rede para evitar JS antigo.
+  // No modo offline, usar a última cópia já validada no cache.
+  // Não intercepta APIs, sessões, fotos privadas ou rotas fora deste escopo.
+  try{
+   const online=await fetch(req,{cache:'no-store'});
+   if(online.ok){
+    // Falha por quota de cache não pode impedir a aplicação de abrir online.
+    try{await cache.put(req,online.clone())}catch{}
+   }
+   return online;
+  }catch{
+   if(cached)return cached;
+   throw Error('Recurso público indisponível sem conexão')
   }
-  if(cached)return cached;
-  return fetch(req);
  })());
 });
