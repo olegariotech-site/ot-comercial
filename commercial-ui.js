@@ -34,7 +34,9 @@ window.OTCommercialUI=(()=>{
   q('agendaToday').textContent='Hoje, '+fmt(a.day)+' · horário de São Paulo';
   q('commercialCoverage').textContent=(offlineMode||navigator.onLine===false?'Dados do aparelho. ':'')+(state.coverage?'Última consulta comercial completa: '+new Date(state.coverage.updatedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})+'. ':'Cobertura comercial offline ainda não confirmada. ')+(fieldReady()?'Cofre desbloqueado. ':'Desbloqueie o cofre para editar e preparar offline. ')+(state.error||'')+(state.projection.errors.length?' Há registros inválidos/conflitos a conferir.':'');
   const counts=[['Vencidos',a.groups.vencidos.length],['Hoje',a.groups.hoje.length],['Próximos',a.groups.proximos.length],['A definir',a.groups.definir.length],['Propostas abertas',m.propostasAbertas],['Implantação fechada',c.money(m.implantacao)],['MRR contratado',c.money(m.mrr)],['Ações concluídas',m.retornosCumpridos]];
-  q('commercialMetrics').innerHTML=counts.map(([label,n])=>'<div class="card metric"><span>'+esc(label)+'</span><strong>'+esc(n)+'</strong></div>').join('');
+  const cards=rows=>rows.map(([label,n])=>'<div class="card metric'+(typeof n==='string'?' financial':'')+'"><span>'+esc(label)+'</span><strong>'+esc(n)+'</strong></div>').join('');
+  q('commercialMetrics').innerHTML=cards(counts.slice(0,4));q('businessMetrics').innerHTML=cards(counts.slice(4));
+  q('agendaFilter').options[1].textContent='Propostas a retomar ('+m.propostasAbertas+')';
   q('commercialFunnel').textContent=a.actionCount+' ações abertas · '+a.planningCount+' itens a planejar. Estágios atuais: '+Object.entries(m.stages).map(([k,n])=>c.STAGES[k]+': '+n).join(' · ')+'. Retornos na data: '+m.pontuais+'/'+m.comData+'. Ganhos entre oportunidades que tiveram proposta: '+(m.conversaoPropostas==null?'sem base':Math.round(m.conversaoPropostas*100)+'%')+'. Valores de receita, sem estimativa de lucro.';
   q('agendaGroups').innerHTML=Object.entries({vencidos:'Vencidos',hoje:'Hoje',proximos:'Próximos',definir:'A definir'}).map(([key,label])=>{
    const rows=a.groups[key].filter(r=>!proposalOnly||['proposta','negociacao'].includes(r.opportunity?.estagio));
@@ -127,6 +129,7 @@ window.OTCommercialUI=(()=>{
  async function ready(){
   if(!userId)return;const owner=userId,lines=[];
   lines.push('Rede: '+(navigator.onLine===false?'sem internet':'disponível; autorização confirmada apenas nas consultas à nuvem'));
+  lines.push('Autenticação: '+(session?.access_token?'sessão cloud presente; validade confirmada nas consultas':'sem sessão cloud; autentique ao reconectar'));
   lines.push('Cofre: '+(fieldReady()?'desbloqueado':'bloqueado'));
   if(fieldReady()){
    const pending=await OTOfflineVault.pending(),visits=await OTOfflineVault.list('visit'),photos=await OTOfflineVault.list('photo');
@@ -151,7 +154,7 @@ window.OTCommercialUI=(()=>{
   const rows=state.projection.opportunities.map(o=>[companies.find(x=>x.id===o.empresa_id)?.nome,o.titulo,c.STAGES[o.estagio],o.implantacao_proposta,o.mensalidade_proposta,o.valor_fechado,o.recorrencia_contratada,o.recorrencia_status].map((x,i)=>clean(i>=3&&i<=6&&x!=null?(x/100).toFixed(2):x)).join(';'));
   download(new Blob(['\ufeff'+[header.join(';'),...rows].join('\r\n')],{type:'text/csv;charset=utf-8'}),'ot-oportunidades-'+c.today()+'.csv');
  }
- function clear(){state.ticket++;state.events=[];state.projection=c.project([]);state.coverage=null;state.owner=null;for(const id of ['agendaGroups','commercialMetrics','commercialFunnel','opportunityList','readyReport'])q(id).textContent='';for(const d of ['quickDialog','opportunityDialog','actionDialog','readyDialog'])q(d).close();setView('agenda')}
+ function clear(){state.ticket++;state.events=[];state.projection=c.project([]);state.coverage=null;state.owner=null;for(const id of ['agendaGroups','commercialMetrics','businessMetrics','commercialFunnel','opportunityList','readyReport'])q(id).textContent='';for(const d of ['quickDialog','opportunityDialog','actionDialog','readyDialog'])q(d).close();setView('agenda')}
  q('agendaTab').addEventListener('click',()=>setView('agenda'));q('walletTab').addEventListener('click',()=>setView('wallet'));q('quickNewBtn').addEventListener('click',openQuick);q('quickForm').addEventListener('submit',submitQuick);q('opportunityForm').addEventListener('submit',submitOpportunity);q('actionForm').addEventListener('submit',submitAction);q('agendaFilter').addEventListener('change',render);q('newOpportunityBtn').addEventListener('click',()=>openOpportunity());q('planCompanyBtn').addEventListener('click',()=>openAction({companyId:active?.id}));q('exportCommercialBtn').addEventListener('click',exportCommercial);
  q('opportunityForm').elements.namedItem('estagio').addEventListener('change',ev=>{if(['ganho','perdido'].includes(ev.target.value))q('financeDetails').open=true});
  q('actionForm').elements.namedItem('continuidade').addEventListener('change',ev=>q('nextActionFields').hidden=ev.target.value==='encerrar');

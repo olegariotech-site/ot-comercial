@@ -1,4 +1,4 @@
-name: Gate V1.4 Premium Sales Hub
+name: Gate OT Comercial V1.6 e regressão RC1
 
 on:
   pull_request:
@@ -81,7 +81,7 @@ jobs:
       - name: Arquivar somente arquivos de homologação
         uses: actions/upload-artifact@v4
         with:
-          name: ot-v15-preview-staging-nao-publicado
+          name: ot-v16-preview-staging-nao-publicado
           path: artifacts/staging-preview/
           if-no-files-found: error
           retention-days: 7

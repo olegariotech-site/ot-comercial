@@ -111,6 +111,7 @@ async function launch(offline=false,profileDir=profile){
    throw Error('Gate D não passou ['+label+']; último estado: '+JSON.stringify(last));
   }
   async function screenshot(file,full=false){
+   if(full)await evalJS('window.scrollTo({top:0,left:0,behavior:"instant"});true');
    const options={format:'png',captureBeyondViewport:full};
    if(full){const m=await send('Page.getLayoutMetrics');const box=m.cssContentSize||m.contentSize;options.clip={x:0,y:0,width:box.width,height:box.height,scale:1};}
    const r=await send('Page.captureScreenshot',options);
@@ -170,7 +171,7 @@ try{
  nextId=await browser.evalJS('(async()=>OTCommercial.project(await OTOfflineVault.list("commercial")).actions.find(a=>a.empresa_id==='+JSON.stringify(other.id)+'&&a.estado==="aberta").id)()');
  await browser.evalJS('document.querySelector(\'[data-reschedule="'+nextId+'"]\').click();true');await browser.until('document.querySelector("#actionDialog").open','reagendamento');await form('actionForm',{descricao:'Revisar proposta no horário combinado',data_prevista:shift(3)});await idle('actionDialog');
  assert.equal(await browser.evalJS('(async()=>OTCommercial.project(await OTOfflineVault.list("commercial")).actions.filter(a=>a.empresa_id==='+JSON.stringify(other.id)+'&&a.estado==="aberta").length)()'),1);
- await browser.screenshot('01-agenda-integrada.png',true);
+ await browser.screenshot('01-agenda-integrada.png',true);await browser.evalJS('document.querySelector("#commercialIndicators").open=true;true');await browser.screenshot('01b-indicadores.png',true);await browser.evalJS('document.querySelector("#commercialIndicators").open=false;true');
  // Apresentação pública independente, sem sessão/cofre/notas nas páginas.
  await browser.send('Page.navigate',{url:mock.origin+'/cases.html?segment=alimentacao'});await browser.until('document.querySelectorAll("#caseCards article").length===2','cases por segmento');assert.equal(await browser.evalJS('document.body.textContent.includes("QA V16")'),false);assert.equal(await browser.evalJS('typeof OTOfflineVault'),'undefined');await browser.screenshot('02-cases-publicos.png');
  await browser.send('Page.navigate',{url:mock.origin+'/index.html'});await browser.until(shown('appView'),'retorno ao CRM');await unlockOnline();
