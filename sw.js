@@ -32,7 +32,9 @@ self.addEventListener('fetch',event=>{
  if(url.origin!==self.location.origin||!ALLOWED.has(url.pathname))return;
  event.respondWith((async()=>{
   const cache=await caches.open(CACHE);
-  const cached=await cache.match(req,{ignoreSearch:true});
+  // Chave canonica: nao criar copias diferentes para ?utm ou ?v.
+  const key=url.origin+url.pathname;
+  const cached=await cache.match(key);
   // Shell público: preferir SEMPRE a versão da rede para evitar JS antigo.
   // No modo offline, usar a última cópia já validada no cache.
   // Não intercepta APIs, sessões, fotos privadas ou rotas fora deste escopo.
@@ -40,7 +42,7 @@ self.addEventListener('fetch',event=>{
    const online=await fetch(req,{cache:'no-store'});
    if(online.ok){
     // Falha por quota de cache não pode impedir a aplicação de abrir online.
-    try{await cache.put(req,online.clone())}catch{}
+    try{await cache.put(key,online.clone())}catch{}
    }
    return online;
   }catch{
