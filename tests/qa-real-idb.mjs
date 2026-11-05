@@ -17,6 +17,7 @@ const owner='11111111-1111-4111-8111-111111111111';
 const company='22222222-2222-4222-8222-222222222222';
 const visit='33333333-3333-4333-8333-333333333333';
 const photo='44444444-4444-4444-8444-444444444444';
+const remotePhoto='55555555-5555-4555-8555-555555555555';
 const pass='SegredoForteLocalOT-2026!';
 fs.mkdirSync(fixtureDir,{recursive:true});
 const html=[
@@ -29,6 +30,7 @@ const html=[
 'const company='+JSON.stringify(company)+';',
 'const visit='+JSON.stringify(visit)+';',
 'const photo='+JSON.stringify(photo)+';',
+'const remotePhoto='+JSON.stringify(remotePhoto)+';',
 'const pass='+JSON.stringify(pass)+';',
 'function check(cond,msg){if(!cond)throw Error(msg)}',
 '(async()=>{',
@@ -40,6 +42,9 @@ const html=[
 '  const p=await v.stagePhoto({id:photo,empresa_id:company,arquivo_nome:"teste.png",categoria:"Fachada"},',
 '    new Blob([new Uint8Array([137,80,78,71,13,10,26,10])],{type:"image/png"}));',
 '  check(c.id===company&&t.id===visit&&p.id===photo,"IDs locais não persistiram");',
+'  await v.cachePhoto({id:remotePhoto,empresa_id:company,storage_path:owner+"/"+company+"/"+remotePhoto+".png",arquivo_nome:"do-desktop.png",bytes:8,categoria:"Fachada"},',
+'    new Blob([new Uint8Array([137,80,78,71,13,10,26,10])],{type:"image/png"}));',
+'  check((await v.getPhoto(remotePhoto)).blob.size===8,"Foto remota não foi armazenada");',
 '  check((await v.pending()).length===3,"Fila de pendências incompleta");',
 ' }else if(stage==="reopen"){',
 '  check(await v.has(owner),"Cofre desapareceu depois de fechar o navegador");',
@@ -51,6 +56,7 @@ const html=[
 '  check(c.nome==="Comércio Teste Off","Empresa desapareceu");',
 '  check(t.nota==="Visitado sem conexão","Visita desapareceu");',
 '  check(p.blob.size===8,"Foto foi perdida");',
+'  check((await v.getPhoto(remotePhoto)).blob.size===8,"Foto remota cifrada não sobreviveu ao reinício");',
 '  check((await v.pending()).length===3,"Fila não persistiu");',
 '  const raw=await new Promise((resolve,reject)=>{',
 '   const o=indexedDB.open("ot-comercial-encrypted-vault-v1");o.onerror=()=>reject(o.error);',
