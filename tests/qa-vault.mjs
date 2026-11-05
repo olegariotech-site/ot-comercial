@@ -109,6 +109,28 @@ async function run(){
  const retries=(await vault.pending()).find(p=>p.opId===visit.opId);
  assert.equal(retries.attempts,1);
  await assert.rejects(vault.stagePhoto({},new Blob([new Uint8Array(7*1024*1024)],{type:'image/png'})));
- console.log('COFRE AES-GCM: 12 verificações de dados, fotos, fila, senha, recuperação e persistência simulada concluídas.');
+ const cloudId='55555555-5555-4555-8555-555555555555';
+ const cloudBytes=new Blob([new Uint8Array([137,80,78,71,13,10,26,10])],{type:'image/png'});
+ const cloudMeta={id:cloudId,empresa_id:company.id,
+  storage_path:owner+'/'+company.id+'/'+cloudId+'.png',
+  arquivo_nome:'original-do-desktop.png',categoria:'Fachada',bytes:8,publicacao_autorizada:false};
+ const prior=(await vault.pending()).length;
+ const saved=await vault.cachePhoto(cloudMeta,cloudBytes);
+ assert.equal(saved.cached,true);
+ assert.equal((await vault.pending()).length,prior,'Cache remoto NÃO pode criar fila de upload');
+ assert.equal((await vault.getPhoto(cloudId)).blob.size,8);
+ assert.equal((await vault.cachePhoto(cloudMeta,cloudBytes)).existing,true);
+ assert.equal((await vault.pending()).length,prior,'Releitura NÃO pode duplicar pendências');
+ const cloudStored=fakeDB.stores.get('blobs').get(owner+':blob:'+cloudId);
+ assert.ok(cloudStored.box.iv&&cloudStored.box.cipher);
+ assert.ok(!JSON.stringify(cloudStored).includes('original-do-desktop.png'));
+ await assert.rejects(vault.cachePhoto({...cloudMeta,storage_path:'outro-dono/'+cloudId+'.png'},cloudBytes));
+ await assert.rejects(vault.cachePhoto({...cloudMeta,bytes:9000},cloudBytes));
+ await vault.acknowledge(photo.opId);
+ assert.equal((await vault.getPhoto(photo.id)).blob.size,8,'Foto enviada deve permanecer disponível offline');
+ vault.lock();
+ await vault.unlock(owner,pass);
+ assert.equal((await vault.getPhoto(cloudId)).blob.size,8,'Foto remota cifrada deve sobreviver a reabertura do cofre');
+ console.log('COFRE AES-GCM: fotos antigas e locais acessíveis offline; cache sem fila de upload.');
 }
 await run();
