@@ -63,9 +63,38 @@ window.OTOfflineVault=(()=>{
  function recordKey(owner,kind,id){return owner+':'+kind+':'+id}
  function queueKey(owner,id){return owner+':queue:'+id}
  function blobKey(owner,id){return owner+':blob:'+id}
+ function unchanged(vault){if(unlocked!==vault)throw Error('Cofre ou conta alterados durante a operação')}
+ async function exclusive(fn){
+  const owner=live().owner;
+  if(globalThis.navigator?.locks?.request)
+   return navigator.locks.request(NAME+':write:'+owner,()=>{if(live().owner!==owner)throw Error('Conta alterada');return fn()});
+  return fn();
+ }
+ async function capacity(bytes){
+  const info=await estimate();
+  if(info?.quota&&Number.isFinite(info.usage)&&info.usage+bytes*2+65536>info.quota)
+   throw Error('Espaço insuficiente no aparelho. Pendências existentes foram preservadas.');
+ }
+ function photoMetadata(info,company){
+  const owner=live().owner;
+  if(!info||typeof info!=='object')throw Error('Metadados inválidos');
+  idValue(info.id);idValue(info.empresa_id);
+  if(company&&info.empresa_id!==company)throw Error('Foto pertence a outra empresa');
+  if(info.owner_id&&info.owner_id!==owner)throw Error('Foto de outro proprietário');
+  const parts=String(info.storage_path||'').split('/');
+  const file=/^([0-9a-f-]{36})\.(jpg|png|webp)$/i.exec(parts[2]||'');
+  if(parts.length!==3||parts[0]!==owner||parts[1]!==info.empresa_id||!file)
+   throw Error('Caminho de foto inválido ou de outro proprietário');
+  idValue(file[1]);
+  const mime={jpg:'image/jpeg',png:'image/png',webp:'image/webp'}[file[2].toLowerCase()];
+  if(!Number.isSafeInteger(Number(info.bytes))||Number(info.bytes)<1||Number(info.bytes)>6*1024*1024)
+   throw Error('Tamanho de foto inválido ou acima de 6 MB');
+  if(info.mime&&info.mime!==mime)throw Error('Formato de imagem inválido');
+  return {mime};
+ }
  function validateKind(kind){if(!KINDS.includes(kind))throw Error('Tipo de registro inválido')}
- function ownerId(owner){if(!/^[0-9a-f-]{30,40}$/i.test(owner))throw Error('Identificador de usuário inválido');return owner}
- function idValue(id){if(typeof id!=='string'||!/^[0-9a-f-]{30,40}$/i.test(id))throw Error('ID de registro inválido');return id}
+ function ownerId(owner){if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(owner))throw Error('Identificador de usuário inválido');return owner}
+ function idValue(id){if(typeof id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))throw Error('ID de registro inválido');return id}
  async function create(owner,passphrase){
   ownerId(owner);
   if(typeof passphrase!=='string'||passphrase.length<12)throw Error('Senha local deve ter pelo menos 12 caracteres.');
@@ -110,6 +139,7 @@ window.OTOfflineVault=(()=>{
   if(!(file instanceof Blob)||file.size>6*1024*1024||file.size===0)throw Error('Arquivo inválido ou acima de 6 MB');
   if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('Formato de imagem inválido');
   const vault=live(),owner=vault.owner,kind='photo';
+  idValue(info?.empresa_id);await capacity(file.size);unchanged(vault);
   const id=idValue(info?.id||uid()),opId=uid(),rec=recordKey(owner,kind,id),qkey=queueKey(owner,opId),bkey=blobKey(owner,id);
   const record={...info,id,mime:file.type,bytes:file.size};
   const [meta,photo,queued]=await Promise.all([
@@ -129,21 +159,21 @@ window.OTOfflineVault=(()=>{
  async function cachePhoto(info,file){
   const vault=live(),owner=vault.owner;
   if(!info||typeof info!=='object')throw Error('Metadados inválidos');
-  const id=idValue(info.id),company=idValue(info.empresa_id),path=String(info.storage_path||'');
-  if(!path.startsWith(owner+'/'+company+'/'+id+'.'))throw Error('Foto de outro proprietário');
+  const id=idValue(info.id),{mime}=photoMetadata(info);
   if(!(file instanceof Blob)||!file.size||file.size>6*1024*1024)
    throw Error('Foto inválida ou acima de 6 MB');
   if(Number(info.bytes)!==file.size)throw Error('Tamanho da foto diferente do registrado');
-  const extension=path.split('.').pop().toLowerCase();
-  const types={jpg:'image/jpeg',png:'image/png',webp:'image/webp'};
-  const mime=types[extension];
   if(!mime||(file.type&&file.type!=='application/octet-stream'&&file.type!==mime))
    throw Error('Formato de imagem inválido');
   if((await pending()).some(p=>p.kind==='photo'&&p.payload?.id===id))
    return {cached:false,skippedPending:true};
   const rec=recordKey(owner,'photo',id),bkey=blobKey(owner,id);
-  if(await read('records',rec)&&await read('blobs',bkey))
-   return {cached:true,existing:true};
+  try{
+   const saved=await getPhoto(id);unchanged(vault);
+   if(saved?.blob.size===file.size&&saved.metadata.storage_path===info.storage_path&&saved.blob.type===mime)
+    return {cached:true,existing:true};
+  }catch(e){unchanged(vault)}
+  await capacity(file.size);unchanged(vault);
   const [recordBox,photoBox]=await Promise.all([
    seal(jsonBytes({...info,mime,bytes:file.size}),vault.key,'record:'+rec),
    seal(await file.arrayBuffer(),vault.key,'photo:'+bkey)
@@ -178,6 +208,35 @@ window.OTOfflineVault=(()=>{
   });
   return rows.length;
  }
+ // Somente após lista remota COMPLETA e autorizada. Pendências locais ficam
+ // intactas; não recria base nem chaves. Descarta apenas cópias já sincronizadas.
+ async function reconcile(kind,records,{companyId,complete=false}={}){
+  validateKind(kind);
+  if(!complete||!Array.isArray(records)||records.length>5000)throw Error('Liste distante complète obligatoire');
+  if(companyId)idValue(companyId);
+  const vault=live(),owner=vault.owner,ids=new Set(records.map(r=>idValue(r.id)));
+  if(records.some(r=>(r.owner_id&&r.owner_id!==owner)||(companyId&&r.empresa_id!==companyId)))
+   throw Error('Liste distante de compte ou entreprise incorrecte');
+  const dirty=new Set((await pending()).map(p=>p.kind+':'+p.payload.id));
+  const local=await list(kind),removed=local.filter(r=>(!companyId||r.empresa_id===companyId)&&!ids.has(r.id)&&!dirty.has(kind+':'+r.id));
+  const targets=[];
+  for(const r of removed){
+   if(kind==='company'){
+    const children=[...(await list('visit')).map(x=>({kind:'visit',r:x})),...(await list('photo')).map(x=>({kind:'photo',r:x}))].filter(x=>x.r.empresa_id===r.id);
+    if(children.some(x=>dirty.has(x.kind+':'+x.r.id)))continue;
+    for(const child of children)targets.push({kind:child.kind,id:child.r.id});
+   }
+   targets.push({kind,id:r.id});
+  }
+  unchanged(vault);
+  if(targets.length)await operation(['records','blobs'],'readwrite',tx=>{
+   for(const target of targets){
+    tx.objectStore('records').delete(recordKey(owner,target.kind,target.id));
+    if(target.kind==='photo')tx.objectStore('blobs').delete(blobKey(owner,target.id));
+   }
+  });
+  return targets.length;
+ }
  async function has(owner){ownerId(owner);return !!(await read('meta',owner))}
  async function owners(){return (await readAll('meta')).map(meta=>meta.key).filter(id=>/^[0-9a-f-]{30,40}$/i.test(id))}
  async function get(kind,id){
@@ -185,21 +244,21 @@ window.OTOfflineVault=(()=>{
   const vault=live(),key=recordKey(vault.owner,kind,id);
   const stored=await read('records',key);
   if(!stored)return null;
-  return decode(await unseal(stored.box,vault.key,'record:'+key));
+  const value=decode(await unseal(stored.box,vault.key,'record:'+key));unchanged(vault);return value;
  }
  async function getPhoto(id){
-  const meta=await get('photo',id);if(!meta)return null;
-  const vault=live(),key=blobKey(vault.owner,id),row=await read('blobs',key);
+  const vault=live(),meta=await get('photo',id);unchanged(vault);if(!meta)return null;
+  const key=blobKey(vault.owner,id),row=await read('blobs',key);
   if(!row)throw Error('Imagem pendente não encontrada no armazenamento local');
   const raw=await unseal(row.box,vault.key,'photo:'+key);
-  return {metadata:meta,blob:new Blob([raw],{type:meta.mime})};
+  unchanged(vault);return {metadata:meta,blob:new Blob([raw],{type:meta.mime})};
  }
  async function list(kind){
   validateKind(kind);
   const vault=live(),rows=(await readAll('records')).filter(r=>r.owner===vault.owner&&r.kind===kind);
   const result=[];
   for(const row of rows)result.push(decode(await unseal(row.box,vault.key,'record:'+row.key)));
-  return result;
+  unchanged(vault);return result;
  }
  async function pending(){
   const vault=live(),rows=(await readAll('queue')).filter(r=>r.owner===vault.owner);
@@ -209,7 +268,7 @@ window.OTOfflineVault=(()=>{
    const payload=decode(await unseal(row.box,vault.key,'queue:'+row.key));
    results.push({opId:row.opId,kind:row.kind,attempts:row.attempts,createdAt:row.createdAt,payload});
   }
-  return results;
+  unchanged(vault);return results;
  }
  async function acknowledge(opId){
   idValue(opId);
@@ -225,6 +284,7 @@ window.OTOfflineVault=(()=>{
   await operation(['queue'],'readwrite',tx=>tx.objectStore('queue').put(row));return true;
  }
  async function persist(){return navigator.storage?.persist?navigator.storage.persist():false}
- async function estimate(){return navigator.storage?.estimate?navigator.storage.estimate():null}
- return {supported,has,owners,create,unlock,lock,activeOwner,stage,stagePhoto,cachePhoto,snapshot,get,getPhoto,list,pending,acknowledge,failed,persist,estimate,uuid:uid};
+ async function estimate(){return globalThis.navigator?.storage?.estimate?navigator.storage.estimate():null}
+ const serialized=fn=>(...args)=>exclusive(()=>fn(...args));
+ return {supported,has,owners,create,unlock,lock,activeOwner,stage:serialized(stage),stagePhoto:serialized(stagePhoto),cachePhoto:serialized(cachePhoto),snapshot:serialized(snapshot),reconcile:serialized(reconcile),photoMetadata,get,getPhoto,list,pending,acknowledge:serialized(acknowledge),failed:serialized(failed),persist,estimate,uuid:uid};
 })();

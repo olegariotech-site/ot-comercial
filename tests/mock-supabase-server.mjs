@@ -14,11 +14,12 @@ const json=(res,status,obj)=>{res.writeHead(status,{'Content-Type':'application/
 const fail=(res,status,msg)=>json(res,status,{message:msg});
 const body=async(req,limit=8*1024*1024)=>{let bytes=0;const parts=[];for await(const x of req){bytes+=x.length;if(bytes>limit)throw Error('Exceeds test size limit');parts.push(x)}return Buffer.concat(parts)};
 export function startMockSupabase(root,tls=null){
- const map={ot_empresas:new Map(),ot_visitas:new Map(),ot_fotos:new Map()},media=new Map(),calls=[];
+ const map={ot_empresas:new Map(),ot_visitas:new Map(),ot_fotos:new Map()},media=new Map(),calls=[],apiRequests=[];
  const scheme=tls?'https':'http';
  const server=(tls?https:http).createServer(tls||{},async(req,res)=>{
   const url=new URL(req.url,'http://127.0.0.1');
   const pathname=decodeURIComponent(url.pathname);
+  if(/^\/(auth|rest|storage)\/v1\//.test(pathname))apiRequests.push(req.method+' '+pathname);
   try{
    if(pathname==='/config.js'){
     res.writeHead(200,{'Content-Type':'text/javascript','Cache-Control':'no-store'});
@@ -94,7 +95,7 @@ export function startMockSupabase(root,tls=null){
   }catch(e){fail(res,500,'Erro no teste: '+e.message)}
  });
  return new Promise(resolve=>server.listen(0,'127.0.0.1',()=>resolve({
-  server,origin:scheme+'://127.0.0.1:'+server.address().port,map,media,calls,user:USER,
+  server,origin:scheme+'://127.0.0.1:'+server.address().port,map,media,calls,apiRequests,user:USER,
   close:()=>new Promise(r=>server.close(r))
  })));
 }
@@ -102,5 +103,6 @@ function rows(table,params,map){
  let all=[...map[table].values()];
  const id=params.get('id');if(id?.startsWith('eq.'))all=all.filter(r=>r.id===id.slice(3));
  const company=params.get('empresa_id');if(company?.startsWith('eq.'))all=all.filter(r=>r.empresa_id===company.slice(3));
- return all;
+ const offset=Number(params.get('offset')||0),limit=Number(params.get('limit')||all.length);
+ return all.slice(offset,offset+limit);
 }

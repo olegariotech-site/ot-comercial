@@ -131,6 +131,39 @@ async function run(){
  vault.lock();
  await vault.unlock(owner,pass);
  assert.equal((await vault.getPhoto(cloudId)).blob.size,8,'Foto remota cifrada deve sobreviver a reabertura do cofre');
- console.log('COFRE AES-GCM: fotos antigas e locais acessíveis offline; cache sem fila de upload.');
+
+ // Corrupção de uma cópia limpa deve ser detectada e reparada, nunca dar sucesso por existência.
+ const broken=fakeDB.stores.get('blobs').get(owner+':blob:'+cloudId);
+ broken.box.cipher=new Uint8Array([1,2,3]).buffer;
+ await assert.rejects(vault.getPhoto(cloudId));
+ assert.equal((await vault.cachePhoto(cloudMeta,cloudBytes)).existing,false);
+ assert.equal((await vault.getPhoto(cloudId)).blob.size,8);
+ await assert.rejects(vault.cachePhoto({...cloudMeta,owner_id:'88888888-8888-4888-8888-888888888888'},cloudBytes));
+ await assert.rejects(vault.cachePhoto({...cloudMeta,storage_path:cloudMeta.storage_path+'/extra.png'},cloudBytes));
+ await assert.rejects(vault.cachePhoto({...cloudMeta,storage_path:cloudMeta.storage_path.replace('.png','.jpg')},cloudBytes));
+ await assert.rejects(vault.reconcile('photo',[],{complete:false}));
+ const pendingPhoto=await vault.stagePhoto({empresa_id:company.id},cloudBytes);
+ await vault.reconcile('photo',[],{companyId:company.id,complete:true});
+ assert.equal(await vault.getPhoto(cloudId),null,'Exclusão remota deve descartar cópia limpa');
+ assert.ok(await vault.getPhoto(pendingPhoto.id),'Pendência não pode ser descartada');
+ assert.ok((await vault.pending()).some(p=>p.opId===pendingPhoto.opId));
+ const beforeQuota=(await vault.pending()).length;
+ scope.navigator={storage:{estimate:async()=>({usage:99999,quota:100000})}};
+ await assert.rejects(vault.cachePhoto(cloudMeta,cloudBytes),/Espaço insuficiente/);
+ await assert.rejects(vault.stagePhoto({empresa_id:company.id},cloudBytes),/Espaço insuficiente/);
+ assert.equal((await vault.pending()).length,beforeQuota);
+ delete scope.navigator;
+ // 1/3/12 fotos reais do ponto de vista do cofre, sem fila nem retransmissões.
+ for(let i=0;i<12;i++){
+  const id=webcrypto.randomUUID();
+  await vault.cachePhoto({...cloudMeta,id,storage_path:owner+'/'+company.id+'/'+id+'.png'},cloudBytes);
+ }
+ assert.equal((await vault.list('photo')).length,13);
+ assert.equal((await vault.pending()).length,beforeQuota);
+ const first=(await vault.list('photo')).find(p=>p.storage_path);
+ // Nenhuma leitura assíncrona pode devolver dados depois de um lock.
+ const reading=vault.getPhoto(first.id);vault.lock();await assert.rejects(reading);
+ await vault.unlock(owner,pass);
+ console.log('COFRE AES-GCM PASS: 12 fotos, reparo, quota, exclusão remota, pendências preservadas e lock durante leitura.');
 }
 await run();

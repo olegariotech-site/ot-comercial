@@ -17,6 +17,7 @@ function create({online=true,unlocked=true,existing=[0,1],networkFail=false,wron
  const state=new Map(existing.map(i=>[ids[i],new Blob([new Uint8Array(i+8)],{type:'image/png'})]));
  const calls=[],notifications=[],btn={disabled:false},output={textContent:''};
  const deps={
+  galleryBusy:false,userId:owner,cloudRows:async()=>files,
   active:{id:company},offlineMode:false,navigator:{onLine:online},
   fieldReady:()=>unlocked,
   $:id=>id==='preparePhotoOfflineBtn'?btn:output,
@@ -29,7 +30,8 @@ function create({online=true,unlocked=true,existing=[0,1],networkFail=false,wron
    return {blob:async()=>new Blob([new Uint8Array(wrongSize?1:i+8)],{type:'image/png'})};
   },
   OTOfflineVault:{
-   getPhoto:async id=>state.has(id)?{blob:state.get(id)}:null,
+   photoMetadata:(p,id)=>assert.equal(p.empresa_id,id),
+   getPhoto:async id=>state.has(id)?{blob:state.get(id),metadata:files.find(f=>f.id===id)}:null,
    cachePhoto:async(p,blob)=>{assert.equal(p.id,ids[2]);if(blob.size!==p.bytes)throw Error('Tamanho diferente');state.set(p.id,blob);return {cached:true}},
   },
   bucket:'ot-clientes-privado',encodePath:p=>p,

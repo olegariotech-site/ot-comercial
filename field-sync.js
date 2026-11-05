@@ -46,6 +46,7 @@ window.OTFieldSync=(()=>{
   if(vault.activeOwner()!==owner)throw Error('Desbloqueie o cofre correto antes de sincronizar');
   if(typeof online==='function'&&!online())throw Error('Dispositivo sem conexão; dados preservados no cofre');
   if(api.owner!==owner)throw Error('Sessão de outro usuário. Nenhum dado foi enviado.');
+  const unchanged=()=>{if(vault.activeOwner()!==owner||api.owner!==owner)throw Error('Sessão alterada durante sincronização');};
   const ops=await vault.pending();
   const sorted=ops.slice().sort((a,b)=>(KIND_ORDER[a.kind]??99)-(KIND_ORDER[b.kind]??99)||a.createdAt-b.createdAt);
   const result={total:sorted.length,synced:0,failed:0,pending:sorted.length,errors:[]};
@@ -57,6 +58,7 @@ window.OTFieldSync=(()=>{
     const kind=task.kind,id=requireUuid(task.payload.id,'Registro');
     if(!TABLE[kind])throw Error('Tipo de registro não reconhecido');
     const remote=await api.getRow(TABLE[kind],id);
+    unchanged();
     if(remote){
      let local;
      if(kind==='photo'){
@@ -64,7 +66,12 @@ window.OTFieldSync=(()=>{
       local={...photo.metadata,storage_path:deterministicPhotoPath(owner,photo.metadata)};
      }else local=await vault.get(kind,id);
      if(!local||!matches(kind,remote,local))throw Error('Conflito: registro com o mesmo ID foi alterado na nuvem');
+     if(kind==='photo'){
+      const photo=await vault.getPhoto(id);
+      await api.ensurePhoto(local.storage_path,photo.blob,true);
+     }
      if(kind==='visit'&&local.retorno_em)await api.updateReturn(local.empresa_id,local.retorno_em);
+     unchanged();
      await vault.acknowledge(task.opId);result.synced++;result.pending--;onProgress?.(result);continue;
     }
     let local;
@@ -86,8 +93,10 @@ window.OTFieldSync=(()=>{
      if(!existing||!matches(kind,existing,row))throw err;
     }
     const confirmed=await api.getRow(TABLE[kind],id);
+    unchanged();
     if(!confirmed||!matches(kind,confirmed,row))throw Error('Servidor não confirmou o registro');
     if(kind==='visit'&&row.retorno_em)await api.updateReturn(row.empresa_id,row.retorno_em);
+    unchanged();
     await vault.acknowledge(task.opId);
     result.synced++;result.pending--;
    }catch(e){

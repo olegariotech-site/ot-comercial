@@ -26,7 +26,7 @@ jobs:
       - name: Verificar sintaxe da rotina de teste do staging real (sem executar)
         run: node --check tests/staging/qa-live-api.mjs
       - name: Testar vitrine, cards e integridade de arquivos
-        run: node --test tests/qa-premium.test.mjs tests/qa-integration.test.mjs tests/qa-sync.test.mjs tests/qa-photo-storage.test.mjs tests/qa-offline-history.test.mjs tests/qa-prepare-gallery.test.mjs
+        run: node --test tests/qa-*.test.mjs
       - name: Validar WebCrypto e transações simuladas do cofre
         run: node tests/qa-vault.mjs
       - name: Verificar IndexedDB real após fechar e reabrir Chrome
@@ -51,13 +51,16 @@ jobs:
         with:
           node-version: '22'
       - name: Gate D — ensaio completo em HTTPS mock sem produção
-        run: node tests/qa-field-http-e2e.mjs
+        run: |
+          for attempt in 1 2 3; do
+            OT_E2E_ITERATION=$attempt node tests/qa-field-http-e2e.mjs
+          done
       - name: Arquivar imagens fictícias do campo
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ot-v15-gate-d-campo
-          path: artifacts/gate-d-field/*.png
+          path: artifacts/gate-d-field/
           if-no-files-found: warn
           retention-days: 7
 

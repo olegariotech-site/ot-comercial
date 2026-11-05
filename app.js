@@ -8,6 +8,7 @@ const bucket = 'ot-clientes-privado';
 const tokenStorageKey = 'ot_comercial_v12_sessao';
 let session = null, userId = null, companies = [], active = null, photos = [], objectUrls = [];
 let offlineMode=false, syncBusy=false, lastSyncIssue='';
+let refreshInFlight=null, galleryBusy=false;
 const offlineOwnerKey='ot_comercial_offline_owner_v1';
 function fieldReady(){return !!(userId&&window.OTOfflineVault?.activeOwner()===userId);}
 function rememberedOwner(){try{return localStorage.getItem(offlineOwnerKey)||'';}catch{return '';}}
@@ -28,27 +29,47 @@ function fmtDate(v){ if(!v)return 'Não agendado'; const [y,m,d]=v.split('-');re
 function esc(s){return String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function safeFile(s){return String(s||'imagem').replace(/[\r\n\t]/g,' ').slice(0,130);}
 function qs(obj){return Object.entries(obj).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');}
-function safeErr(e){return e instanceof Error? e.message:String(e);}
+function safeErr(e){return (e instanceof Error?e.message:String(e)).replace(/https?:\/\/\S+|Bearer\s+\S+|sb_(?:secret|publishable)_\S+|eyJ[A-Za-z0-9_.-]+|[0-9a-f-]{36}(?:\/[^\s]+)?/gi,'[oculto]').slice(0,220);}
 function connOk(){try{const u=new URL(cfg.url);return u.protocol==='https:'&&!!cfg.publishableKey&&cfg.publishableKey!=='sb_publishable_SUA_CHAVE'&&!cfg.publishableKey.includes('service_role')&&!cfg.publishableKey.startsWith('sb_secret_');}catch{return false;}}
 const base = connOk()?cfg.url.replace(/\/$/,''):'';
 function headers(access=true){const h={'apikey':cfg.publishableKey};if(access&&session?.access_token)h.Authorization=`Bearer ${session.access_token}`;return h;}
 function storeSession(value){session=value;try{if(value)sessionStorage.setItem(tokenStorageKey,JSON.stringify(value));else sessionStorage.removeItem(tokenStorageKey);}catch{ /* storage indisponível: sessão só em memória */ }}
 async function raw(url,opts={}){let response;try{response=await fetch(url,opts);}catch{throw Error('Sem conexão com a internet. Dados não foram salvos.');}if(!response.ok){let msg=`Erro HTTP ${response.status}`;try{const d=await response.json();msg=d.msg||d.error_description||d.message||d.error||msg;}catch{}throw Error(msg);}return response;}
-async function refreshSession(){if(!session?.refresh_token)throw Error('Faça login novamente.');
+async function refreshSession(){
+ if(refreshInFlight)return refreshInFlight;
+ const current=session;
+ const run=async()=>{if(!session?.refresh_token)throw Error('Faça login novamente.');
  const r=await raw(base+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{...headers(false),'Content-Type':'application/json'},body:JSON.stringify({refresh_token:session.refresh_token})});
- const d=await r.json();storeSession({...d,expires_at:Math.floor(Date.now()/1000)+d.expires_in});return d;}
+ const d=await r.json();if(session!==current)throw Error('Sessão alterada durante renovação');storeSession({...d,expires_at:Math.floor(Date.now()/1000)+d.expires_in});return d;};
+ refreshInFlight=run();try{return await refreshInFlight}finally{refreshInFlight=null}
+}
 async function authenticated(){if(!session?.access_token)throw Error('Você precisa entrar novamente.');
  if((session.expires_at||0)-Math.floor(Date.now()/1000)<60)await refreshSession();}
 async function request(path,{method='GET',body,storage=false,retry=true}={}){
+ const owner=userId;
  await authenticated();const url=base+(storage?'/storage/v1/':'/rest/v1/')+path;
+ if(userId!==owner)throw Error('Conta alterada durante a operação');
  const hs={...headers(true)};if(body!==undefined&&!storage)hs['Content-Type']='application/json';
  if(!storage&&['POST','PATCH'].includes(method))hs.Prefer='return=representation';
  let res;try{res=await fetch(url,{method,headers:hs,body:body===undefined?undefined:storage?body:JSON.stringify(body)});}catch{throw Error('Sem conexão. Operação não concluída.');}
+ if(userId!==owner)throw Error('Conta alterada durante a operação');
  if(res.status===401&&retry){await refreshSession();return request(path,{method,body,storage,retry:false});}
  if(!res.ok){let msg=`Falha (${res.status})`;try{const d=await res.json();msg=d.message||d.error||d.msg||msg;}catch{}throw Error(msg);}
  if(storage)return res;
  if(res.status===204||res.headers.get('content-length')==='0')return [];
  const rawtxt=await res.text();return rawtxt?JSON.parse(rawtxt):[];
+}
+// Paginação explícita: uma resposta truncada não autoriza descartar cópias locais.
+async function cloudRows(table,filter=''){
+ const owner=userId,result=[];
+ for(let offset=0;offset<=5000;offset+=500){
+  const page=await request(table+'?select=*&order=id.asc&limit=500&offset='+offset+filter);
+  if(owner!==userId||!Array.isArray(page))throw Error('Consulta incompleta ou conta alterada');
+  result.push(...page);
+  if(result.length>5000)throw Error('Carteira acima do limite de preparo; cópias locais preservadas');
+  if(page.length<500)return result;
+ }
+ throw Error('Não foi possível confirmar a lista completa');
 }
 function encodePath(p){return p.split('/').map(encodeURIComponent).join('/');}
 function convertRaw(s){return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
@@ -140,7 +161,7 @@ function cloudApi(owner){
   updateReturn:async(companyId,date)=>request('ot_empresas?id=eq.'+encodeURIComponent(companyId),{
    method:'PATCH',body:{retorno_em:date}
   }),
-  ensurePhoto:async(path,blob)=>{
+  ensurePhoto:async(path,blob,verifyOnly=false)=>{
    const url=base+'/storage/v1/object/'+bucket+'/'+encodePath(path);
    const download=async(retry=true)=>{
     await authenticated();
@@ -161,6 +182,7 @@ function cloudApi(owner){
     if(remote.size!==blob.size||(await sha(remote))!==(await sha(blob)))
      throw Error('Conflito: existe outra foto nesse caminho da nuvem. A cópia local foi preservada.');
    };
+   if(verifyOnly){await verify();return;}
    // POST PRIMEIRO: o arquivo ainda não existe, portanto um GET prévio pode
    // retornar 400/404 de formas diferentes conforme a versão do Storage.
    // O caminho é determinístico, e não usamos upsert: jamais sobrescrever foto.
@@ -189,11 +211,20 @@ function cloudApi(owner){
   }
  };
 }
-async function syncNow(){
+async function syncNow(){return syncUnderLock(false);}
+async function syncUnderLock(held=false){
  if(syncBusy||!fieldReady())return;
  if(navigator.onLine===false){toast('Sem internet: seus registros permanecem no aparelho.');return}
- syncBusy=true;await updateFieldState();
+ if(!held){
+  if(!navigator.locks?.request){toast('Este navegador não oferece trava entre abas. Use Edge ou Chrome atualizado para sincronizar.');return;}
+  return navigator.locks.request('ot-field-sync:'+base+':'+userId,{ifAvailable:true},lock=>{
+   if(!lock){toast('Outra aba está sincronizando. Aguarde a confirmação.');return;}
+   return syncUnderLock(true);
+  });
+ }
+ syncBusy=true;
  try{
+  await updateFieldState();
   if(offlineMode||!session?.access_token){
    const owner=window.OTOfflineVault.activeOwner(),ok=await restore();
    if(!ok||owner!==userId){
@@ -226,8 +257,11 @@ async function load(){
   companies=await window.OTOfflineVault.list('company');
   render();await updateFieldState();return;
  }
- const items=await request('ot_empresas?select=*&order=created_at.desc');
- if(fieldReady())await window.OTOfflineVault.snapshot('company',items);
+ const items=await cloudRows('ot_empresas');
+ if(fieldReady()){
+  await window.OTOfflineVault.reconcile('company',items,{complete:true});
+  await window.OTOfflineVault.snapshot('company',items);
+ }
  const locals=fieldReady()?await window.OTOfflineVault.list('company'):[];
  const byId=new Map(items.map(item=>[item.id,item]));
  if(fieldReady()){
@@ -276,7 +310,10 @@ async function openCompany(id){active=companies.find(c=>c.id===id);if(!active)re
 async function loadVisits(id){
  let remote=[];
  if(!offlineMode&&navigator.onLine!==false){
-  try{remote=await request('ot_visitas?select=*&empresa_id=eq.'+encodeURIComponent(id)+'&order=realizado_em.desc&limit=50');}
+  try{
+   remote=await cloudRows('ot_visitas','&empresa_id=eq.'+encodeURIComponent(id));
+   if(fieldReady())await OTOfflineVault.reconcile('visit',remote,{companyId:id,complete:true});
+  }
   catch(e){if(!fieldReady())throw e;toast('Histórico na nuvem indisponível; mostrando cópia protegida.');}
   if(fieldReady()&&remote.length){
    try{
@@ -328,10 +365,15 @@ async function loadPhotos(id){
  destroyObjectUrls();let cloud=[],cloudLoaded=false;
  if(!offlineMode&&navigator.onLine!==false){
   try{
-   cloud=await request('ot_fotos?select=*&empresa_id=eq.'+encodeURIComponent(id)+'&order=created_at.desc');
+   cloud=await cloudRows('ot_fotos','&empresa_id=eq.'+encodeURIComponent(id));
+   if(fieldReady()){
+    for(const p of cloud)OTOfflineVault.photoMetadata(p,id);
+    await OTOfflineVault.reconcile('photo',cloud,{companyId:id,complete:true});
+   }
    cloudLoaded=true;
   }catch(e){
    if(!fieldReady())throw e;
+   cloud=[];
    toast('Galeria na nuvem indisponível; exibindo fotos locais.');
   }
  }
@@ -349,7 +391,7 @@ async function loadPhotos(id){
    if(fieldReady()){
     try{
      const saved=await OTOfflineVault.getPhoto(p.id);
-     if(saved?.blob?.size){blob=saved.blob;stored=true;}
+     if(saved?.blob?.size&&saved.metadata.empresa_id===id&&(!p.storage_path||saved.blob.size===Number(p.bytes))){blob=saved.blob;stored=true;}
     }catch{ /* sem cópia local utilizável; consultar nuvem se disponível */ }
    }
    if(!blob&&!offlineMode&&navigator.onLine!==false&&p.storage_path){
@@ -377,29 +419,36 @@ async function loadPhotos(id){
    if(label)label.textContent=' · FOTO INDISPONÍVEL';
   }
  }
+ if(!galleryBusy&&active?.id===id){
+  const ready=photos.filter(p=>document.getElementById('photo-offline-'+p.id)?.textContent===' · DISPONÍVEL OFFLINE').length;
+  $('photoCacheState').textContent=ready+' de '+photos.length+' fotos confirmadas no cofre deste aparelho.';
+ }
 }
 // Ação explícita para preparar a galeria inteira antes de sair para o campo.
 // Verifica cada imagem cifrada; não cria novos uploads nem altera registros remotos.
 async function preparePhotoGalleryOffline(){
- if(!active)return;
+ if(!active||galleryBusy)return;
  const btn=$('preparePhotoOfflineBtn'),output=$('photoCacheState'),companyId=active.id;
  if(!fieldReady()||offlineMode||navigator.onLine===false){
   output.textContent='Conecte a nuvem e desbloqueie o cofre para preparar as fotos.';
   return;
  }
- btn.disabled=true;
+ galleryBusy=true;btn.disabled=true;
  output.textContent='Conferindo fotografias no cofre...';
  try{
-  const cloud=await request('ot_fotos?select=*&empresa_id=eq.'+encodeURIComponent(companyId)+'&order=created_at.desc');
+  const owner=userId;
+  const cloud=await cloudRows('ot_fotos','&empresa_id=eq.'+encodeURIComponent(companyId));
   if(!Array.isArray(cloud))throw Error('Resposta inesperada da galeria');
   let ready=0;const failures=[];
   for(const [index,p] of cloud.entries()){
    if(active?.id!==companyId)throw Error('A empresa foi alterada durante a preparação');
    if(!fieldReady())throw Error('Cofre bloqueado durante a preparação');
    try{
+    if(owner!==userId)throw Error('Conta alterada durante a preparação');
+    OTOfflineVault.photoMetadata(p,companyId);
     let saved;
     try{saved=await OTOfflineVault.getPhoto(p.id)}catch{}
-    if(!saved?.blob?.size||saved.blob.size!==Number(p.bytes)){
+    if(!saved?.blob?.size||saved.blob.size!==Number(p.bytes)||saved.metadata.empresa_id!==companyId||saved.metadata.storage_path!==p.storage_path){
      if(!p.storage_path)throw Error('Arquivo sem caminho na nuvem');
      const resp=await request('object/authenticated/'+bucket+'/'+encodePath(p.storage_path),{storage:true});
      const blob=await resp.blob();
@@ -407,7 +456,7 @@ async function preparePhotoGalleryOffline(){
      if(!result.cached)throw Error('Foto ainda pendente, não pode ser substituída');
      saved=await OTOfflineVault.getPhoto(p.id);
     }
-    if(!saved?.blob||saved.blob.size!==Number(p.bytes))
+    if(owner!==userId||!fieldReady()||!saved?.blob||saved.blob.size!==Number(p.bytes)||saved.metadata.empresa_id!==companyId||saved.metadata.storage_path!==p.storage_path)
      throw Error('Imagem não confirmada após gravar no cofre');
     ready++;
    }catch(e){failures.push('Foto '+(index+1)+': '+safeErr(e));}
@@ -424,7 +473,7 @@ async function preparePhotoGalleryOffline(){
  }catch(e){
   output.textContent='Preparação não concluída: '+safeErr(e);
   toast('Galeria não preparada: '+safeErr(e));
- }finally{btn.disabled=false;}
+ }finally{galleryBusy=false;btn.disabled=false;}
 }
 function renderPhotoCards(){
  $('photoList').innerHTML=photos.map(p=>'<article class="photo-card"><img id="img-'+
@@ -448,10 +497,10 @@ async function uploadPhotos(fileList){if(!active||!fileList.length)return;const 
   continue;
  }
  if(offlineMode||navigator.onLine===false)throw Error('Desbloqueie o cofre antes de fotografar sem internet.');
- const path=`${userId}/${active.id}/${crypto.randomUUID()}.${allowed[file.type]}`;
+ const photoId=crypto.randomUUID(),path=`${userId}/${active.id}/${photoId}.${allowed[file.type]}`;
  await authenticated();const upload=await raw(`${base}/storage/v1/object/${bucket}/${encodePath(path)}`,{method:'POST',headers:{...headers(true),'Content-Type':file.type,'x-upsert':'false'},body:file});
  if(!upload.ok)throw Error('Falha no envio da foto.');
- try{await request('ot_fotos',{method:'POST',body:{empresa_id:active.id,storage_path:path,arquivo_nome:safeFile(file.name),categoria:$('photoCategory').value,bytes:file.size,publicacao_autorizada:$('photoConsent').checked}});}catch(e){try{await request(`object/${bucket}/${encodePath(path)}`,{method:'DELETE',storage:true});}catch{}throw e;}
+ try{await request('ot_fotos',{method:'POST',body:{id:photoId,empresa_id:active.id,storage_path:path,arquivo_nome:safeFile(file.name),categoria:$('photoCategory').value,bytes:file.size,publicacao_autorizada:$('photoConsent').checked}});}catch(e){throw Error('Envio sem confirmação. Confira a galeria antes de repetir.');}
  done++;toast(`Foto ${done} de ${selected.length} salva na nuvem.`);
  }catch(e){toast('Foto não salva: '+safeErr(e));}}
  $('photoCamera').value='';$('photoFiles').value='';try{await loadPhotos(active.id);await updateFieldState();if(staged&&!offlineMode&&navigator.onLine!==false){await syncNow();await loadPhotos(active.id);}}catch(e){toast('Galeria ou sincronização pendente: '+safeErr(e));}}

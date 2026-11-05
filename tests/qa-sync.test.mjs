@@ -112,3 +112,19 @@ test('Sem conexão e sessão errada não enviam nenhum dado',async()=>{
  await assert.rejects(sync.sync({vault:env.vault,api:env.api,owner,online:()=>true}));
  assert.equal(env.calls.length,0);assert.equal(env.queue.length,1);
 });
+
+
+test('Troca de conta enquanto GET está em voo não reconhece nem envia registros',async()=>{
+ const env=environment([{kind:'company',data:company}]);
+ env.api.getRow=async()=>{env.vault.activeOwner=()=>null;return null};
+ const r=await sync.sync({vault:env.vault,api:env.api,owner,online:()=>true});
+ assert.equal(r.synced,0);assert.equal(r.failed,1);assert.equal(env.queue.length,1);
+ assert.equal(env.calls.length,0);
+});
+test('Foto com metadados já existentes continua pendente se o objeto não confere',async()=>{
+ const env=environment([{kind:'photo',data:photo}]);
+ env.remote.set('ot_fotos:'+photoId,{...photo,storage_path:sync.deterministicPhotoPath(owner,photo)});
+ env.api.ensurePhoto=async(path,blob,verifyOnly)=>{assert.equal(verifyOnly,true);throw Error('SHA-256 divergente')};
+ const r=await sync.sync({vault:env.vault,api:env.api,owner,online:()=>true});
+ assert.equal(r.failed,1);assert.equal(env.queue.length,1);
+});

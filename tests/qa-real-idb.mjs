@@ -46,6 +46,12 @@ const html=[
 '    new Blob([new Uint8Array([137,80,78,71,13,10,26,10])],{type:"image/png"}));',
 '  check((await v.getPhoto(remotePhoto)).blob.size===8,"Foto remota não foi armazenada");',
 '  check((await v.pending()).length===3,"Fila de pendências incompleta");',
+'  const failedId="77777777-7777-4777-8777-777777777777",put=IDBObjectStore.prototype.put;',
+'  IDBObjectStore.prototype.put=function(...args){if(this.name==="blobs")throw new DOMException("QA quota","QuotaExceededError");return put.apply(this,args)};',
+'  let quotaFailed=false;try{await v.cachePhoto({id:failedId,empresa_id:company,storage_path:owner+"/"+company+"/"+failedId+".png",bytes:8},new Blob([new Uint8Array([137,80,78,71,13,10,26,10])],{type:"image/png"}))}catch{quotaFailed=true}finally{IDBObjectStore.prototype.put=put}',
+'  check(quotaFailed,"Quota não falhou");check(await v.get("photo",failedId)===null,"Gravação parcial depois de quota");',
+'  check((await v.pending()).length===3,"Quota afetou pendências anteriores");',
+
 ' }else if(stage==="reopen"){',
 '  check(await v.has(owner),"Cofre desapareceu depois de fechar o navegador");',
 '  check((await v.owners()).includes(owner),"Cofre não foi localizado pelos metadados");',

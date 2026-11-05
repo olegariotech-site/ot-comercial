@@ -9,7 +9,7 @@ import {spawn,spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {startMockSupabase} from './mock-supabase-server.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
-const out=path.join(root,'artifacts','gate-d-field');
+const out=path.join(root,'artifacts','gate-d-field',process.env.OT_E2E_ITERATION||'single');
 fs.mkdirSync(out,{recursive:true});
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function findChrome(){
@@ -37,6 +37,7 @@ const mock=await startMockSupabase(root,{
  key:fs.readFileSync(key),cert:fs.readFileSync(cert)
 });
 const PWD='CofreOT_Local_2026_MuitoForte!';
+const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+jVwAAAAASUVORK5CYII=','base64');
 let browser=null;
 async function launch(offline=false){
  fs.rmSync(path.join(profile,'DevToolsActivePort'),{force:true});
@@ -154,7 +155,7 @@ try{
  await browser.until(isShown('companyPanel'),'abrir ficha do teste');
  await browser.evalJS('(()=>{document.querySelector("#visitNote").value="Visita de teste sem internet";document.querySelector("#visitNext").value="Mostrar portfólio";document.querySelector("#visitReturn").value="2026-11-09";document.querySelector("#visitForm button[type=submit]").click();return true})()');
  await browser.until('document.querySelector("#pendingCount").textContent.startsWith("2 pendentes")','visita local',20000);
- await browser.evalJS('(()=>{const f=new File([new Uint8Array([137,80,78,71,13,10,26,10])],"teste.png",{type:"image/png"});const dt=new DataTransfer();dt.items.add(f);const input=document.querySelector("#photoFiles");input.files=dt.files;input.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
+ await browser.evalJS('(()=>{const f=new File([Uint8Array.from(atob("'+png.toString('base64')+'"),c=>c.charCodeAt(0))],"teste.png",{type:"image/png"});const dt=new DataTransfer();dt.items.add(f);const input=document.querySelector("#photoFiles");input.files=dt.files;input.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
  await browser.until('document.querySelector("#pendingCount").textContent.startsWith("3 pendentes")','foto local',25000);
  await browser.until('document.querySelector("#photoList").textContent.includes("SALVA NO APARELHO")','galeria local');
  assert.equal(mock.map.ot_empresas.size,0,'Nuvem simulada recebeu dados mesmo offline!');
@@ -189,6 +190,9 @@ try{
  console.log('Gate D: cofre reaberto, carteira e três pendências recuperadas.');
  await browser.send('Network.emulateNetworkConditions',{offline:false,latency:0,downloadThroughput:0,uploadThroughput:0});
  await browser.until('navigator.onLine===true','reconectado');
+ // navigator.onLine é síncrono, mas updateFieldState aguarda IndexedDB.
+ // Aguardar estado acionável, sem aumentar timeout ou repetir teste falho.
+ await browser.until('!document.querySelector("#syncPendingBtn").disabled||!document.querySelector("#loginView").classList.contains("hidden")||document.querySelector("#pendingCount").textContent==="0 pendentes"','controle de reconexão pronto');
  await browser.evalJS('document.querySelector("#syncPendingBtn").click();true');
  const state=await browser.until('(()=>{const login=document.querySelector("#loginView");const queue=document.querySelector("#pendingCount");return !login.classList.contains("hidden")?"login":queue.textContent==="0 pendentes"?"synced":false})()','reautenticação ou sync',15000);
  if(state==='login'){
@@ -204,6 +208,48 @@ try{
  assert.equal(mock.calls.filter(s=>s.startsWith('PHOTO ')).length,1,'Upload duplicado');
  await browser.screenshot('03-confirmado-na-nuvem-mock.png');
  console.log('Gate D: reconexão, login, confirmação de 3 registros e 1 imagem. Sem duplicação.');
+ const companyId=[...mock.map.ot_empresas.keys()][0];
+ // Duas imagens antigas simulam uploads feitos em outro aparelho.
+ for(const id of ['55555555-5555-4555-8555-555555555555','66666666-6666-4666-8666-666666666666']){
+  const storage_path=mock.user+'/'+companyId+'/'+id+'.png';
+  mock.map.ot_fotos.set(id,{id,owner_id:mock.user,empresa_id:companyId,storage_path,bytes:png.length,arquivo_nome:id+'.png',categoria:'Fachada',publicacao_autorizada:false});
+  mock.media.set('ot-clientes-privado/'+storage_path,{bytes:png,type:'image/png'});
+ }
+ await browser.evalJS('document.querySelector("#companyList [data-id]").click();true');
+ await browser.until('document.querySelectorAll("#photoList img").length===3&&[...document.querySelectorAll("#photoList img")].every(im=>im.naturalWidth>0)','3 imagens reais online');
+ await browser.evalJS('document.querySelector("#preparePhotoOfflineBtn").click();true');
+ await browser.until('document.querySelector("#photoCacheState").textContent.includes("3 de 3 fotos disponíveis offline")','preparo 3/3 confirmado');
+ const beforePrepare=mock.apiRequests.length;
+ await browser.evalJS('document.querySelector("#preparePhotoOfflineBtn").click();true');
+ await browser.until('!document.querySelector("#preparePhotoOfflineBtn").disabled','segundo preparo concluído');
+ assert.equal(mock.apiRequests.slice(beforePrepare).filter(x=>x.includes('/object/')).length,0,'Preparo repetido baixou arquivos existentes');
+ await browser.close();browser=null;
+ const networkBefore=mock.apiRequests.length;
+ browser=await launch(true);
+ await browser.until(isShown('offlineLoginView'),'reabrir galeria offline');
+ await browser.evalJS('(()=>{document.querySelector("#offlinePassword").value='+JSON.stringify(PWD)+';document.querySelector("#offlineUnlockForm button[type=submit]").click();return true})()');
+ await browser.until(isShown('appView'),'cofre offline para galeria');
+ await browser.until('!!document.querySelector("#companyList [data-id]")','carteira offline');
+ await browser.evalJS('document.querySelector("#companyList [data-id]").click();true');
+ await browser.until('document.querySelectorAll("#photoList img").length===3&&[...document.querySelectorAll("#photoList img")].every(im=>im.naturalWidth>0)','3 miniaturas reais depois de fechar/reabrir offline');
+ const downloads=path.join(tmp,'downloads');fs.mkdirSync(downloads,{recursive:true});
+ await browser.send('Page.setDownloadBehavior',{behavior:'allow',downloadPath:downloads});
+ await browser.evalJS('[...document.querySelectorAll("[data-download]")].forEach(b=>b.click());true');
+ for(let i=0;i<60&&fs.readdirSync(downloads).filter(n=>n.endsWith('.png')).length<3;i++)await wait(100);
+ const files=fs.readdirSync(downloads).filter(n=>n.endsWith('.png'));
+ assert.equal(files.length,3,'Três downloads offline devem concluir');
+ for(const file of files)assert.deepEqual(fs.readFileSync(path.join(downloads,file)),png,'Download offline com bytes divergentes');
+ assert.equal(await browser.evalJS('document.querySelector("#pendingCount").textContent'),'0 pendentes');
+ assert.equal(mock.apiRequests.length,networkBefore,'Galeria offline iniciou uma chamada HTTP');
+ await browser.screenshot('04-tres-fotos-offline.png');
+ console.log('Gate D: 3 imagens decodificadas, 3 downloads exatos após reiniciar offline, 0 chamadas HTTP, 0 pendências.');
+ fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({result:'PASS',environment:'Chromium Linux HTTPS mock',physical:false,photosOffline:3,downloadsOffline:3,httpOffline:0,pending:0},null,2));
+
+}catch(e){
+ if(browser){
+  try{console.log('Gate D diagnóstico',await browser.evalJS('({online:navigator.onLine,syncDisabled:document.querySelector("#syncPendingBtn")?.disabled,pending:document.querySelector("#pendingCount")?.textContent,toast:document.querySelector("#toast")?.textContent})'));await browser.screenshot('99-falha.png')}catch{}
+ }
+ throw e;
 }finally{
  if(browser)await browser.close();
  await mock.close();

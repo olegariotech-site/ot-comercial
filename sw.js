@@ -1,10 +1,10 @@
 /* OT Comercial V1.5 — cache de páginas públicas SOMENTE.
  * Não armazena dados do Supabase, sessões, autenticação nem responses privadas.
- * O CRM ainda exige internet para criar e recuperar fichas nesta etapa.
+ * Fichas e fotos offline ficam exclusivamente no cofre cifrado, fora deste cache.
  */
 'use strict';
 const PREFIX='ot-comercial-shell-';
-const CACHE=PREFIX+'v1-5-gate-b';
+const CACHE=PREFIX+'v1-5-rc1';
 const PATHS=[
  './','./index.html','./style.css','./app.js','./config.js','./ot-logo.js',
  './offline-vault.js','./field-sync.js','./offline-status.js','./manifest.webmanifest',

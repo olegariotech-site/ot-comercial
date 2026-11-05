@@ -5,7 +5,7 @@ import { webcrypto } from 'node:crypto';
 
 /* Exercita EXATAMENTE o adaptador ensurePhoto extraído do app.js; sem servidor ou clientes. */
 const app=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
-const start=app.indexOf('  ensurePhoto:async(path,blob)=>{');
+const start=app.indexOf('  ensurePhoto:async(path,blob,verifyOnly=false)=>{');
 const end=app.indexOf('\n  }\n };',start);
 assert.ok(start>=0&&end>start,'Método ensurePhoto não encontrado no CRM');
 const snippet=app.slice(start,end+4);
@@ -81,4 +81,14 @@ test('Interface guarda causa da falha e mantém pendência',()=>{
  assert.match(app,/lastSyncIssue/);
  assert.match(app,/summary\.errors\?\.\[0\]/);
  assert.match(app,/registro local preservado/);
+});
+
+
+test('Metadados existentes exigem SHA-256 do objeto sem reenviar arquivo',async()=>{
+ const events=[];
+ const upload=adapter(async(url,options={})=>{events.push(options.method||'GET');return new Response(photo(),{status:200});});
+ await upload(path,photo(),true);
+ assert.deepEqual(events,['GET']);
+ const missing=adapter(async()=>json(404,{code:'NoSuchKey'}));
+ await assert.rejects(missing(path,photo(),true),/HTTP 404/);
 });
