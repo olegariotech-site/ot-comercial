@@ -1,1 +1,58 @@
 :root{color-scheme:dark;--bg:#0b111d;--paper:#151f30;--line:#2c3b56;--txt:#eff4ff;--muted:#9aabc5;--cyan:#6bc8ed;--accent:#7895ff}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 95% -20%,#26345e,transparent 55%),var(--bg);font:15px/1.48 system-ui,sans-serif;color:var(--txt)}header{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:14px clamp(16px,5vw,60px);border-bottom:1px solid var(--line);background:#0b1321dd;position:sticky;top:0;z-index:5;backdrop-filter:blur(16px)}.brand{display:flex;align-items:center;gap:12px;flex:1}.brand-icon{width:44px;height:44px;border:1px solid #6582c1;border-radius:14px;display:grid;place-items:center;font-weight:900;background:#243657;color:#fff}.brand strong{font-size:18px}.brand small{display:block;font-size:11px;color:var(--muted)}.chip{font-size:12px;color:#f5d294;border:1px solid #564932;background:#29251d;padding:5px 10px;border-radius:30px}main{max-width:1260px;margin:auto;padding:25px clamp(16px,4vw,45px) 60px}.hidden{display:none!important}.card{background:#141e2edf;border:1px solid var(--line);border-radius:18px;padding:22px;min-width:0}.setup,.login{max-width:720px;margin:30px auto}.login{max-width:430px}.eyebrow{color:#9cbcff;font-size:11px;text-transform:uppercase;letter-spacing:.13em;font-weight:800}.heading,.sectionhead{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}.heading{margin-bottom:22px}h1{font-size:clamp(27px,4vw,37px);margin:5px 0;letter-spacing:-.04em}h2{font-size:21px;letter-spacing:-.03em;margin:5px 0}h3{font-size:15px;margin:23px 0 10px}p{margin:6px 0;color:var(--muted)}.btn{border:1px solid #526381;background:#263552;color:#fff;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px}.btn.primary{background:linear-gradient(105deg,#557cff,#7869e5);border-color:#8294fa}.btn.secondary{background:#253248}.btn.danger{background:#402733;border-color:#875264;color:#ffc9d5}.btn:disabled{opacity:.5;cursor:wait}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}.metric span{display:block;color:var(--muted);font-size:12px}.metric strong{display:block;font-size:29px;margin-top:11px}.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin:18px 0}.toolbar input{flex:2;min-width:180px}.toolbar select{flex:1;min-width:180px}.company-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.company-card{border:1px solid var(--line);background:#172236;border-radius:16px;padding:18px;cursor:pointer;text-align:left;color:#fff;min-width:0}.company-card:hover,.company-card:focus-visible{border-color:var(--cyan)}.company-card .name{font-weight:800;font-size:16px;overflow-wrap:anywhere}.company-card .meta{font-size:12px;color:var(--muted);margin:6px 0}.company-card .status{font-size:12px;color:#a7dff8;margin-top:13px}.company-card .brief{font-size:12px;color:#c7d2e7;overflow-wrap:anywhere;margin-top:12px}input,select,textarea{background:#0f1929;color:#eef4ff;border:1px solid #42536e;border-radius:9px;padding:11px;width:100%;font:inherit}input:focus,textarea:focus,select:focus{outline:2px solid #64b9e8;outline-offset:1px}label{display:block;color:#c9d6e9;font-size:12px;font-weight:700;margin:10px 0}label input,label textarea,label select{margin-top:5px}textarea{resize:vertical}.muted{color:var(--muted);font-size:12px}.details-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:30px}.note-text{background:#0f1929;border:1px solid #2c3b56;padding:15px;border-radius:11px;white-space:pre-wrap;overflow-wrap:anywhere;color:#ecf2ff}.panel-actions,.photo-controls{display:flex;gap:9px;flex-wrap:wrap}.history{display:grid;gap:9px}.history article{background:#0d1828;border:1px solid var(--line);border-radius:10px;padding:12px}.history small{color:#a9bfda}#companyPanel{margin-top:20px}dialog{border:1px solid #486080;border-radius:19px;background:#101b2c;color:#fff;max-height:90vh;overflow:auto;width:min(800px,94vw);padding:22px;box-shadow:0 30px 90px #000b}dialog::backdrop{background:#000a;backdrop-filter:blur(5px)}.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 15px}.wide{display:block}.formactions{display:flex;justify-content:flex-end;margin-top:14px}.photos{border-top:1px solid var(--line);margin-top:25px;padding-top:5px}.file-button input{display:none}.photo-controls select{width:auto;min-width:135px}.photo-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}.photo-card{border:1px solid var(--line);background:#0c1727;border-radius:12px;overflow:hidden}.photo-card img{width:100%;aspect-ratio:4/3;object-fit:cover;background:#202a3c;display:block}.photo-card .photo-body{padding:10px}.photo-card .photo-body strong{font-size:12px;display:block;overflow-wrap:anywhere}.photo-card .photo-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.photo-card button{font-size:11px;padding:5px 9px}.checkline{display:flex;gap:8px;align-items:start;font-size:12px}.checkline input{width:auto;flex-shrink:0}.empty{padding:20px;border:1px dashed #435574;border-radius:12px;color:var(--muted);grid-column:1/-1}#toast{position:fixed;bottom:20px;right:20px;max-width:min(90vw,440px);padding:12px 16px;border-radius:10px;background:#253c57;color:#fff;z-index:100;box-shadow:0 10px 40px #0009;display:none}@media(max-width:930px){.company-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.photo-grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:640px){header{padding:12px 15px}.chip{font-size:10px}main{padding:18px 13px 60px}.metrics{grid-template-columns:repeat(2,1fr)}.card{padding:16px}.company-grid,.details-grid,.formgrid{grid-template-columns:1fr}.photo-grid{grid-template-columns:repeat(2,1fr)}.heading .btn{width:100%}.photo-controls .file-button{flex:1}.toolbar input,.toolbar select{width:100%;flex:1 1 100%}dialog{padding:15px}}
+
+
+/* OT Comercial V1.4 — refinamento visual premium sem alterar a geometria do CRM */
+body{background:radial-gradient(circle at 93% -10%,#2b4777 0,transparent 37%),radial-gradient(circle at 3% 20%,#261e52 0,transparent 32%),#0a1120}
+header{background:#0b1425e8;border-bottom-color:#3b5277}
+.card{background:linear-gradient(150deg,#17243b,#111c30);border-color:#395072;box-shadow:0 18px 40px #0002}
+.metric{position:relative;overflow:hidden}
+.metric:before{content:"";position:absolute;width:110px;height:110px;background:radial-gradient(circle,#528efc22,transparent 72%);right:-45px;top:-55px;pointer-events:none}
+.metric strong{font-variant-numeric:tabular-nums;letter-spacing:-.04em}
+.company-card{background:linear-gradient(155deg,#192a47,#111d31);box-shadow:0 8px 25px #0003;transition:border-color .15s ease,transform .15s ease}
+.company-card:hover{transform:translateY(-2px)}
+.btn.primary{background:linear-gradient(110deg,#397bd4,#7656de);box-shadow:0 7px 20px #3a62b833}
+.ot-heading-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.ot-presentation{background:linear-gradient(110deg,#17395c,#3a2c74);border:1px solid #7a93f7;color:#e6f5ff}
+.ot-presentation:hover{border-color:#a8e3ff}
+@media(max-width:640px){.ot-heading-actions{width:100%}.ot-heading-actions .btn{width:100%}}
+@media(prefers-reduced-motion:reduce){.company-card{transition:none}.company-card:hover{transform:none}}
+
+/* Identidade OT: arquivo de logo original, sem reinterpretação */
+.brand-icon{overflow:hidden;padding:3px;background:#080808;border-color:#566b88}.brand-icon img{display:block;width:100%;height:100%;object-fit:cover;border-radius:10px}
+
+/* V1.4 Premium Mobile: cabeçalho compacto, sem quebrar o nome da OT. */
+@media(max-width:640px){
+ header{display:grid;grid-template-columns:minmax(0,1fr) auto;
+  grid-template-areas:"brand logout" "state state";gap:7px 10px;
+  align-items:center;padding:10px 14px}
+ header .brand{grid-area:brand;min-width:0;flex:none;gap:9px}
+ header .brand-icon{width:39px;height:39px;min-width:39px;border-radius:11px}
+ header .brand strong{font-size:16px;line-height:1.15}
+ header .brand small{font-size:9.5px;line-height:1.3}
+ header #connectionState{grid-area:state;justify-self:start;font-size:10px;
+  padding:3px 9px;line-height:1.3}
+ header #logoutBtn{grid-area:logout;align-self:center;padding:8px 12px}
+}
+
+/* OT V1.5 — aviso de conectividade: informativo; sem simular salvamento. */
+.offline-notice{max-width:1280px;margin:15px auto 0;padding:12px 18px;
+ color:#ffdfb4;background:#392619;border:1px solid #906038;
+ border-radius:13px;font-size:13px;line-height:1.55}
+.offline-notice[hidden]{display:none!important}
+.offline-notice strong{color:#ffeccf}
+@media(max-width:640px){.offline-notice{margin:8px 13px 0;padding:11px 13px;font-size:12px}}
+
+/* OT Field: estados operacionais claros e botões acessíveis. */
+.field-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #375c7e;
+ border-radius:15px;padding:13px 15px;background:linear-gradient(115deg,#12223a,#181e37);margin:13px 0 18px}
+.field-controls>div{margin-right:auto;min-width:170px}.field-controls strong{display:block;font-size:14px}
+.field-controls small{display:block;font-size:11px;color:#bcd0e8;margin-top:3px}
+.pending-count{color:#d6e6ff;background:#263b5b;border:1px solid #45688b;padding:6px 11px;
+ border-radius:25px;font-size:12px;font-weight:750}
+#offlineLoginView .btn{margin-top:10px}
+@media(max-width:640px){.field-controls{align-items:stretch}.field-controls>div{flex:1 0 100%}.field-controls .btn{flex:1 1 42%}}
+
+/* V1.6: controles funcionais seguindo a identidade existente. */
+[hidden]{display:none!important} nav[aria-label="Áreas comerciais"]{margin-bottom:18px;flex-wrap:wrap}.agenda-section{margin:22px 0}.agenda-section h2{font-size:1.2rem}.agenda-row{padding:16px;margin:10px 0;border:1px solid #314467;border-radius:14px;background:#152139}.agenda-row .ot-heading-actions{flex-wrap:wrap;margin-top:12px}.agenda-row p{margin:8px 0}.agenda-badge{font-size:.8rem;color:#c8d8ef}.opportunity-card{margin:14px 0;padding:16px;border:1px solid #314467;border-radius:14px}.opportunity-card summary,dialog summary{cursor:pointer;padding:12px 0;font-weight:700}fieldset{border:1px solid #314467;border-radius:12px;margin:16px 0}fieldset label{display:flex;gap:8px;align-items:center}fieldset input[type=checkbox]{width:auto;min-height:20px}dialog form{max-height:85dvh;overflow:auto;padding:2px}dialog input,dialog textarea,dialog select{max-width:100%}.metrics .metric strong{overflow-wrap:anywhere}#agendaFilter{min-width:190px}#readyReport p{padding:8px 0;border-bottom:1px solid #314467}@media(max-width:600px){nav[aria-label="Áreas comerciais"] .btn{flex:1 1 43%;text-align:center}.agenda-row .btn{min-height:44px;flex:1 1 43%}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}dialog{max-width:calc(100vw - 18px);width:600px}dialog form{max-height:82dvh}}
+
+#commercialIndicators>summary{cursor:pointer;padding:12px 0;font-weight:700}#businessMetrics .financial strong{font-size:clamp(16px,4.2vw,24px);line-height:1.3;font-variant-numeric:tabular-nums;white-space:nowrap;overflow-x:auto;overflow-wrap:normal}#commercialIndicators{margin-bottom:12px}

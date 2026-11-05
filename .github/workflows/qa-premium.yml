@@ -1,0 +1,127 @@
+name: Gate OT Comercial V1.6 e regressão RC1
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feat/v1-4-vitrine-premium, feat/v1-5-integracao-premium-offline, feat/v1-6-comercial-completa]
+
+concurrency:
+  group: ot-field-gate-d-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qa-premium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar sintaxe da rotina de teste do staging real (sem executar)
+        run: node --check tests/staging/qa-live-api.mjs
+      - name: Testar vitrine, cards e integridade de arquivos
+        run: node --test tests/qa-*.test.mjs tests/v16/*.test.mjs
+      - name: Validar WebCrypto e transações simuladas do cofre
+        run: node tests/qa-vault.mjs
+      - name: Verificar IndexedDB real após fechar e reabrir Chrome
+        run: node tests/qa-real-idb.mjs
+      - name: Renderizar 8 cards e vitrine com Chrome real
+        run: node tests/qa-visual.mjs
+      - name: Guardar capturas para auditoria manual
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ot-v14-qa-visual
+          path: artifacts/v1-4-visual/*.png
+          if-no-files-found: warn
+          retention-days: 7
+
+  field-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Gate D — ensaio completo em HTTPS mock sem produção
+        run: |
+          for attempt in 1 2 3; do
+            OT_E2E_ITERATION=$attempt node tests/qa-field-http-e2e.mjs
+          done
+      - name: Arquivar imagens fictícias do campo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ot-v15-gate-d-campo
+          path: artifacts/gate-d-field/
+          if-no-files-found: warn
+          retention-days: 7
+
+  staging-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preparar preview isolado (sem deploy)
+        run: node tests/staging/build-preview.mjs
+      - name: Validar isolamento local entre preview QA e CRM oficial
+        run: node tests/staging/verify-preview-isolation.mjs
+      - name: Provar acesso anônimo negado no Supabase real de homologação
+        run: node tests/staging/qa-anon-http.mjs
+      - name: Arquivar somente arquivos de homologação
+        uses: actions/upload-artifact@v4
+        with:
+          name: ot-v16-preview-staging-nao-publicado
+          path: artifacts/staging-preview/
+          if-no-files-found: error
+          retention-days: 7
+
+
+  v16-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ot_ci_fixture_only
+        ports: [5432:5432]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar migração e RLS em PostgreSQL efêmero (sem Supabase)
+        env:
+          PGPASSWORD: ot_ci_fixture_only
+        run: psql -h 127.0.0.1 -U postgres -d postgres -f tests/v16/schema.test.sql
+
+  v16-field:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fluxo V1.6 completo, 10 cadastros, dois dispositivos e modo avião
+        run: node tests/v16/qa-commercial-http-e2e.mjs
+      - name: Evidências fictícias V1.6
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ot-v16-campo-integrado
+          path: artifacts/v16-field/
+          retention-days: 7
