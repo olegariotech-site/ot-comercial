@@ -144,3 +144,21 @@ test('Todos os controles referenciados pelo CRM existem no HTML, e scripts estã
  assert.match(app,/OTOfflineVault\.stage\('company'/);
  assert.match(app,/OTOfflineVault\.stage\('visit'/);
 });
+
+
+test('Galeria usa foto cifrada mesmo sem pendencia e guarda foto remota sem upload',()=>{
+ const start=app.indexOf('async function loadPhotos(id){');
+ const end=app.indexOf('\nasync function uploadPhotos(fileList)',start);
+ const downloadStart=app.indexOf('async function downloadPhoto(id){');
+ const downloadEnd=app.indexOf('\nasync function deletePhoto(id){',downloadStart);
+ assert.ok(start>=0&&end>start&&downloadStart>0&&downloadEnd>downloadStart);
+ const gallery=app.slice(start,end);
+ const download=app.slice(downloadStart,downloadEnd);
+ assert.match(gallery,/OTOfflineVault\.getPhoto\(p\.id\)/);
+ assert.match(gallery,/OTOfflineVault\.cachePhoto\(p,blob\)/);
+ assert.match(gallery,/DISPONÍVEL OFFLINE/);
+ assert.match(download,/OTOfflineVault\.getPhoto\(id\)/);
+ assert.doesNotMatch(gallery,/OTOfflineVault\.stagePhoto\(/,
+  'Recuperar foto da nuvem não pode enfileirar upload');
+ assert.doesNotThrow(()=>new vm.Script(app,{filename:'app.js'}));
+});
