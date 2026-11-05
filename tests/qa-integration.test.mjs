@@ -77,7 +77,7 @@ test('Atualizacao PWA: JS novo pela rede, fallback antigo so quando offline',asy
  const cache={
   addAll:async()=>{},
   match:async()=>old,
-  put:async(req,response)=>puts.push({path:req.url,version:response.version})
+  put:async(req,response)=>puts.push({path:String(req),version:response.version})
  };
  const scope='https://olegariotech-site.github.io/ot-comercial/';
  const self={
@@ -93,7 +93,7 @@ test('Atualizacao PWA: JS novo pela rede, fallback antigo so quando offline',asy
   return situation==='server-error'?unavailable:fresh;
  };
  vm.runInNewContext(sw,{self,caches,URL,fetch,Error});
- const req={url:scope+'app.js',method:'GET',mode:'cors'};
+ const req={url:scope+'app.js?v=atual',method:'GET',mode:'cors'};
  const attempt=()=>{
   let response;
   listeners.fetch({request:req,respondWith(p){response=p}});
@@ -103,6 +103,7 @@ test('Atualizacao PWA: JS novo pela rede, fallback antigo so quando offline',asy
  assert.strictEqual(await attempt(),fresh);
  assert.equal(puts.length,1);
  assert.equal(puts[0].version,'nova');
+ assert.equal(puts[0].path,scope+'app.js','Cache deve ignorar query strings e nao criar versoes paralelas');
  situation='offline';
  assert.strictEqual(await attempt(),old,'Offline deve manter a copia disponivel');
  assert.equal(puts.length,1,'Nao alterar cache durante falha de rede');
