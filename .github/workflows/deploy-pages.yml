@@ -26,7 +26,7 @@ jobs:
       - name: Preparar site estatico
         run: |
           mkdir -p _site
-          cp index.html app.js style.css config.js robots.txt apresentacao-ot.html apresentacao-servico.css card-export.js ot-logo.js _site/
+          cp commercial-core.js commercial-ui.js cases.html cases.js index.html app.js style.css config.js robots.txt apresentacao-ot.html apresentacao-servico.css card-export.js ot-logo.js _site/
           cp -R solucoes _site/
           cp sw.js offline-vault.js field-sync.js offline-status.js manifest.webmanifest ot-icon.svg _site/
           test -s _site/index.html

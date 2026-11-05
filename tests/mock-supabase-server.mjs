@@ -14,7 +14,7 @@ const json=(res,status,obj,extra={})=>{res.writeHead(status,{'Content-Type':'app
 const fail=(res,status,msg)=>json(res,status,{message:msg});
 const body=async(req,limit=8*1024*1024)=>{let bytes=0;const parts=[];for await(const x of req){bytes+=x.length;if(bytes>limit)throw Error('Exceeds test size limit');parts.push(x)}return Buffer.concat(parts)};
 export function startMockSupabase(root,tls=null){
- const map={ot_empresas:new Map(),ot_visitas:new Map(),ot_fotos:new Map()},media=new Map(),calls=[],apiRequests=[];
+ const map={ot_empresas:new Map(),ot_visitas:new Map(),ot_fotos:new Map(),ot_comercial_eventos:new Map()},media=new Map(),calls=[],apiRequests=[];
  const scheme=tls?'https':'http';
  const server=(tls?https:http).createServer(tls||{},async(req,res)=>{
   const url=new URL(req.url,'http://127.0.0.1');
@@ -57,6 +57,10 @@ export function startMockSupabase(root,tls=null){
       return fail(res,409,'FK: empresa não encontrada');
      const row={...val,owner_id:USER,
       created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+     if(table==='ot_comercial_eventos'){
+      if([...map[table].values()].some(x=>val.parent_id?x.parent_id===val.parent_id:!x.parent_id&&x.entity_id===val.entity_id&&x.entity_type===val.entity_type))return fail(res,409,'Conflito de versão comercial');
+      if(val.parent_id&&![...map[table].values()].some(x=>x.id===val.parent_id&&x.entity_id===val.entity_id&&x.empresa_id===val.empresa_id))return fail(res,409,'Parent comercial ausente');
+     }
      if(table==='ot_visitas')row.realizado_em=val.realizado_em||new Date().toISOString();
      if(table==='ot_fotos'){row.descricao=val.descricao||'';row.publicacao_autorizada=!!val.publicacao_autorizada}
      map[table].set(val.id,row);calls.push('POST '+table+' '+val.id);return json(res,201,[row]);

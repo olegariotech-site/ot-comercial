@@ -21,7 +21,7 @@ assert.ok(!/eyJhbGciOiJI/.test(config),'JWT legado proibido no preview');
 const staticFiles=[
  'index.html','app.js','style.css','robots.txt','apresentacao-ot.html',
  'apresentacao-servico.css','card-export.js','ot-logo.js','sw.js',
- 'offline-vault.js','field-sync.js','offline-status.js','manifest.webmanifest','ot-icon.svg'
+ 'commercial-core.js','commercial-ui.js','cases.html','cases.js','offline-vault.js','field-sync.js','offline-status.js','manifest.webmanifest','ot-icon.svg'
 ];
 fs.rmSync(dest,{recursive:true,force:true});
 fs.mkdirSync(dest,{recursive:true});
@@ -44,19 +44,19 @@ function replaceExactly(file,from,to){
 }
 replaceExactly('app.js',
  "const tokenStorageKey = 'ot_comercial_v12_sessao';",
- "const tokenStorageKey = 'ot_comercial_QA_v15_sessao';");
+ "const tokenStorageKey = 'ot_comercial_QA_v16_sessao';");
 replaceExactly('app.js',
  "const offlineOwnerKey='ot_comercial_offline_owner_v1';",
- "const offlineOwnerKey='ot_comercial_QA_offline_owner_v15';");
+ "const offlineOwnerKey='ot_comercial_QA_offline_owner_v16';");
 replaceExactly('offline-vault.js',
  "const NAME='ot-comercial-encrypted-vault-v1',VERSION=1;",
- "const NAME='ot-comercial-QA-encrypted-vault-v15',VERSION=1;");
+ "const NAME='ot-comercial-QA-encrypted-vault-v16',VERSION=1;");
 replaceExactly('sw.js',
  "const PREFIX='ot-comercial-shell-';",
- "const PREFIX='ot-comercial-QA-shell-';");
+ "const PREFIX='ot-comercial-QA-v16-shell-';");
 replaceExactly('sw.js',
- "const CACHE=PREFIX+'v1-5-rc1';",
- "const CACHE=PREFIX+'v1-5-staging-v7-rc1';");
+ "const CACHE=PREFIX+'v1-6-rc2';",
+ "const CACHE=PREFIX+'v1-6-staging-rc2';");
 replaceExactly('sw.js',
  "(x.startsWith(PREFIX)||x.startsWith('ot-comercial-v13-shell-'))&&x!==CACHE",
  "x.startsWith(PREFIX)&&x!==CACHE");
@@ -83,7 +83,7 @@ const caution='<div id="qaFlag" role="status" style="position:relative;z-index:1
  'AMBIENTE DE HOMOLOGAÇÃO — USAR SOMENTE DADOS FICTÍCIOS · NÃO É O CRM OFICIAL'+
  '</div>';
 html=html.replace(before,caution+'\n'+before);
-html=html.replace('OT Comercial V1.5 | Premium + Offline Lab',
+html=html.replace('OT Comercial V1.6 | Agenda Comercial',
  'OT Comercial | HOMOLOGAÇÃO ISOLADA');
 fs.writeFileSync(indexFile,html);
 
@@ -96,10 +96,10 @@ assert.ok(fs.existsSync(path.join(dest,'offline-vault.js')));
 assert.ok(fs.existsSync(path.join(dest,'field-sync.js')));
 
 for(const [file,required,forbidden] of [
- ['app.js','ot_comercial_QA_v15_sessao','ot_comercial_v12_sessao'],
- ['app.js','ot_comercial_QA_offline_owner_v15','ot_comercial_offline_owner_v1'],
- ['offline-vault.js','ot-comercial-QA-encrypted-vault-v15','ot-comercial-encrypted-vault-v1'],
- ['sw.js','ot-comercial-QA-shell-','ot-comercial-shell-']
+ ['app.js','ot_comercial_QA_v16_sessao','ot_comercial_v12_sessao'],
+ ['app.js','ot_comercial_QA_offline_owner_v16','ot_comercial_offline_owner_v1'],
+ ['offline-vault.js','ot-comercial-QA-encrypted-vault-v16','ot-comercial-encrypted-vault-v1'],
+ ['sw.js','ot-comercial-QA-v16-shell-','ot-comercial-shell-']
 ]){
  const data=fs.readFileSync(path.join(dest,file),'utf8');
  assert.ok(data.includes(required),file+' não foi isolado: '+required);

@@ -9,7 +9,7 @@ const workflow=file('.github/workflows/deploy-pages.yml');
 const style=file('style.css'),app=file('app.js'),store=file('offline-vault.js');
 
 test('Versão integrada preserva o CRM Premium e registra apenas shell público',()=>{
- assert.match(html,/OT Comercial V1\.5/);
+ assert.match(html,/OT Comercial V1\.6/);
  assert.match(html,/class="btn ot-presentation"/);
  assert.match(html,/rel="manifest" href="manifest\.webmanifest"/);
  assert.match(html,/offline-vault\.js/);

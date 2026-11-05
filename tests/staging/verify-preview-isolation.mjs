@@ -12,13 +12,13 @@ const config=read('config.js'),app=read('app.js'),vault=read('offline-vault.js')
 const html=read('index.html'),manifest=JSON.parse(read('manifest.webmanifest'));
 assert.match(config,/https:\/\/efscgxwvaixwqhffwdqu\.supabase\.co/);
 assert.doesNotMatch(config,/agvjqxmrzffkksrgdndn|sb_secret_|service_role|eyJhbGciOiJ/);
-assert.match(app,/ot_comercial_QA_v15_sessao/);
-assert.match(app,/ot_comercial_QA_offline_owner_v15/);
+assert.match(app,/ot_comercial_QA_v16_sessao/);
+assert.match(app,/ot_comercial_QA_offline_owner_v16/);
 assert.doesNotMatch(app,/ot_comercial_v12_sessao|ot_comercial_offline_owner_v1/);
-assert.match(vault,/ot-comercial-QA-encrypted-vault-v15/);
+assert.match(vault,/ot-comercial-QA-encrypted-vault-v16/);
 assert.doesNotMatch(vault,/ot-comercial-encrypted-vault-v1/);
-assert.match(worker,/ot-comercial-QA-shell-/);
-assert.match(worker,/v1-5-staging-v7-rc1/);
+assert.match(worker,/ot-comercial-QA-v16-shell-/);
+assert.match(worker,/v1-6-staging-rc2/);
 assert.doesNotMatch(worker,/ot-comercial-shell-|ot-comercial-v13-shell-/);
 assert.match(html,/AMBIENTE DE HOMOLOGAÇÃO/);
 assert.match(html,/noindex,nofollow,noarchive/);

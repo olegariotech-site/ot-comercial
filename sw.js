@@ -4,10 +4,10 @@
  */
 'use strict';
 const PREFIX='ot-comercial-shell-';
-const CACHE=PREFIX+'v1-5-rc1';
+const CACHE=PREFIX+'v1-6-rc2';
 const PATHS=[
  './','./index.html','./style.css','./app.js','./config.js','./ot-logo.js',
- './offline-vault.js','./field-sync.js','./offline-status.js','./manifest.webmanifest',
+ './commercial-core.js','./commercial-ui.js','./cases.html','./cases.js','./offline-vault.js','./field-sync.js','./offline-status.js','./manifest.webmanifest',
  './apresentacao-ot.html','./apresentacao-servico.css','./card-export.js',
  './solucoes/landing.html','./solucoes/site.html','./solucoes/cardapio.html',
  './solucoes/google.html','./solucoes/catalogo.html','./solucoes/marca.html',
