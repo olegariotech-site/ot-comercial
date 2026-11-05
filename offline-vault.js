@@ -6,7 +6,7 @@
 'use strict';
 window.OTOfflineVault=(()=>{
  const NAME='ot-comercial-encrypted-vault-v1',VERSION=1;
- const KINDS=['company','visit','photo'];
+ const KINDS=['company','visit','photo','commercial'];
  const te=new TextEncoder(),td=new TextDecoder();
  let dbPromise=null,unlocked=null;
  function supported(){return !!(window.indexedDB&&window.crypto?.subtle&&window.crypto?.getRandomValues)}
@@ -135,6 +135,32 @@ window.OTOfflineVault=(()=>{
   });
   return {id,opId,storedLocally:true};
  }
+ async function stageBatch(entries){
+  if(!Array.isArray(entries)||!entries.length||entries.length>30)throw Error('Lote inválido');
+  const vault=live(),owner=vault.owner,prepared=[],known=await list('commercial');
+  for(const entry of entries){
+   validateKind(entry.kind);if(entry.kind==='photo')throw Error('Foto exige transação de arquivo');
+   let record={...entry.record,id:idValue(entry.record.id||uid())};
+   if(entry.kind==='commercial'){
+    if(!window.OTCommercial)throw Error('Regras comerciais indisponíveis');
+    record=window.OTCommercial.event(record,owner);
+    if(record.entity_type==='action'&&record.data.oportunidade_id&&!known.some(x=>x.entity_type==='opportunity'&&x.entity_id===record.data.oportunidade_id&&x.empresa_id===record.empresa_id))throw Error('Ação de outra empresa ou oportunidade indisponível');
+    const existing=known.find(x=>x.id===record.id);
+    if(existing){if(JSON.stringify(existing)!==JSON.stringify(record))throw Error('Conflito de ID comercial');continue;}
+    const same=known.filter(x=>x.entity_id===record.entity_id&&x.entity_type===record.entity_type);
+    if(record.parent_id){
+     if(!same.some(x=>x.id===record.parent_id)||same.some(x=>x.parent_id===record.parent_id))throw Error('Conflito: esta entidade já foi alterada. Reabra a ficha.');
+    }else if(same.length)throw Error('Oportunidade ou ação já existe');
+    known.push(record);
+   }
+   const opId=uid(),key=recordKey(owner,entry.kind,record.id),qkey=queueKey(owner,opId);
+   const box=await seal(jsonBytes(record),vault.key,'record:'+key),queued=await seal(jsonBytes({kind:entry.kind,action:'upsert',record,id:record.id,opId}),vault.key,'queue:'+qkey);
+   prepared.push({record:{key,owner,kind:entry.kind,box,updatedAt:Date.now()},queue:{key:qkey,owner,kind:entry.kind,opId,box:queued,createdAt:Date.now()+prepared.length,attempts:0}});
+  }
+  unchanged(vault);
+  await operation(['records','queue'],'readwrite',tx=>{for(const row of prepared){tx.objectStore('records').put(row.record);tx.objectStore('queue').add(row.queue)}});
+  return {storedLocally:true,count:prepared.length};
+ }
  async function stagePhoto(info,file){
   if(!(file instanceof Blob)||file.size>6*1024*1024||file.size===0)throw Error('Arquivo inválido ou acima de 6 MB');
   if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('Formato de imagem inválido');
@@ -222,7 +248,7 @@ window.OTOfflineVault=(()=>{
   const targets=[];
   for(const r of removed){
    if(kind==='company'){
-    const children=[...(await list('visit')).map(x=>({kind:'visit',r:x})),...(await list('photo')).map(x=>({kind:'photo',r:x}))].filter(x=>x.r.empresa_id===r.id);
+    const children=[...(await list('visit')).map(x=>({kind:'visit',r:x})),...(await list('photo')).map(x=>({kind:'photo',r:x})),...(await list('commercial')).map(x=>({kind:'commercial',r:x}))].filter(x=>x.r.empresa_id===r.id);
     if(children.some(x=>dirty.has(x.kind+':'+x.r.id)))continue;
     for(const child of children)targets.push({kind:child.kind,id:child.r.id});
    }
@@ -283,8 +309,63 @@ window.OTOfflineVault=(()=>{
   row.attempts++;
   await operation(['queue'],'readwrite',tx=>tx.objectStore('queue').put(row));return true;
  }
+ async function getState(name){
+  if(!/^[a-zA-Z0-9_-]{1,40}$/.test(name))throw Error('Estado inválido');
+  const vault=live(),key=vault.owner+':state:'+name,row=await read('meta',key);if(!row)return null;
+  const value=decode(await unseal(row.box,vault.key,'state:'+key));unchanged(vault);return value;
+ }
+ async function setState(name,value){
+  if(!/^[a-zA-Z0-9_-]{1,40}$/.test(name))throw Error('Estado inválido');
+  const vault=live(),key=vault.owner+':state:'+name,box=await seal(jsonBytes(value),vault.key,'state:'+key);unchanged(vault);
+  await operation(['meta'],'readwrite',tx=>tx.objectStore('meta').put({key,owner:vault.owner,box}));
+ }
+ function b64(bytes){const a=new Uint8Array(bytes);let out='';for(let i=0;i<a.length;i+=8192)out+=String.fromCharCode(...a.subarray(i,i+8192));return btoa(out)}
+ function bytes64(s){if(typeof s!=='string'||s.length>12*1024*1024||!/^[A-Za-z0-9+/]*={0,2}$/.test(s))throw Error('Conteúdo cifrado inválido');return Uint8Array.from(atob(s),c=>c.charCodeAt(0))}
+ const packBox=box=>({iv:b64(box.iv),cipher:b64(box.cipher)});
+ function unpackBox(box){const iv=bytes64(box?.iv),cipher=bytes64(box?.cipher);if(iv.length!==12||cipher.length<16)throw Error('Bloco cifrado inválido');return {iv,cipher}}
+ async function exportBackup(){
+  const vault=live(),owner=vault.owner,meta=await read('meta',owner),records=(await readAll('records')).filter(x=>x.owner===owner),queue=(await readAll('queue')).filter(x=>x.owner===owner),blobs=(await readAll('blobs')).filter(x=>x.owner===owner);
+  // Verificar antes de exportar, inclusive cópias de fotos; não exportar sucesso falso.
+  for(const row of records)await unseal(row.box,vault.key,'record:'+row.key);
+  for(const row of queue)await unseal(row.box,vault.key,'queue:'+row.key);
+  for(const row of blobs)await unseal(row.box,vault.key,'photo:'+row.key);
+  unchanged(vault);
+  const pack=rows=>rows.map(row=>({...row,box:packBox(row.box)}));
+  const result={format:'OT-VAULT-BACKUP-1',owner,createdAt:new Date().toISOString(),meta:{salt:b64(meta.salt),verifier:packBox(meta.verifier),iterations:310000},records:pack(records),queue:pack(queue),blobs:pack(blobs)};
+  if(JSON.stringify(result).length>128*1024*1024)throw Error('Cofre acima de 128 MB por backup; preserve o aparelho e sincronize antes de transferir');return result;
+ }
+ async function importBackup(data,passphrase){
+  const vault=live(),owner=vault.owner;
+  if(!data||data.format!=='OT-VAULT-BACKUP-1'||data.owner!==owner)throw Error('Backup pertence a outra conta ou formato inválido');
+  if(typeof passphrase!=='string'||passphrase.length<12||data.meta?.iterations!==310000)throw Error('Senha ou parâmetros de backup inválidos');
+  for(const name of ['records','queue','blobs'])if(!Array.isArray(data[name])||data[name].length>20000)throw Error('Backup acima do limite de registros');
+  const backupKey=await derive(passphrase,bytes64(data.meta.salt));
+  const proof=await unseal(unpackBox(data.meta.verifier),backupKey,'proof:'+owner);
+  if(td.decode(proof)!=='OT-VAULT-OK-v1:'+owner)throw Error('Senha incorreta ou backup danificado');
+  const existing={records:new Map((await readAll('records')).map(r=>[r.key,r])),queue:new Map((await readAll('queue')).map(r=>[r.key,r])),blobs:new Map((await readAll('blobs')).map(r=>[r.key,r]))};
+  const prepared={records:[],queue:[],blobs:[]},ids=new Set();let estimated=0;
+  for(const name of ['records','queue','blobs'])for(const row of data[name]){
+   if(row.owner!==owner||typeof row.key!=='string'||ids.has(name+':'+row.key))throw Error('Associação ou duplicidade inválida no backup');ids.add(name+':'+row.key);
+   const prefix=name==='records'?'record:':name==='queue'?'queue:':'photo:';
+   const raw=await unseal(unpackBox(row.box),backupKey,prefix+row.key);estimated+=raw.byteLength;
+   if(name==='records'){
+    validateKind(row.kind);const value=decode(raw);idValue(value.id);if(row.key!==recordKey(owner,row.kind,value.id))throw Error('Registro de backup inválido');
+    if(row.kind==='commercial')window.OTCommercial.event(value,owner);
+   }else if(name==='queue'){
+    const value=decode(raw);validateKind(value.kind);idValue(value.id);idValue(row.opId);
+    if(value.opId!==row.opId||row.kind!==value.kind||row.key!==queueKey(owner,row.opId)||value.action!=='upsert')throw Error('Fila de backup inválida');
+    if(!data.records.some(r=>r.key===recordKey(owner,value.kind,value.id)))throw Error('Fila sem registro no backup');
+   }else{const id=row.key.slice((owner+':blob:').length);idValue(id);if(row.key!==blobKey(owner,id)||!data.records.some(r=>r.key===recordKey(owner,'photo',id)))throw Error('Foto sem registro no backup')}
+   const current=existing[name].get(row.key);
+   if(current){const currentBytes=await unseal(current.box,vault.key,prefix+row.key);if(b64(currentBytes)!==b64(raw))throw Error('Conflito de restauração: registros atuais preservados. Use um aparelho de recuperação vazio para este backup.');continue;}
+   const box=await seal(raw,vault.key,prefix+row.key);prepared[name].push({...row,box});
+  }
+  await capacity(estimated);unchanged(vault);
+  await operation(['records','queue','blobs'],'readwrite',tx=>{for(const name of ['records','queue','blobs'])for(const row of prepared[name])tx.objectStore(name).add(row)});
+  return {records:prepared.records.length,pending:prepared.queue.length,photos:prepared.blobs.length};
+ }
  async function persist(){return navigator.storage?.persist?navigator.storage.persist():false}
  async function estimate(){return globalThis.navigator?.storage?.estimate?navigator.storage.estimate():null}
  const serialized=fn=>(...args)=>exclusive(()=>fn(...args));
- return {supported,has,owners,create,unlock,lock,activeOwner,stage:serialized(stage),stagePhoto:serialized(stagePhoto),cachePhoto:serialized(cachePhoto),snapshot:serialized(snapshot),reconcile:serialized(reconcile),photoMetadata,checkCapacity:capacity,get,getPhoto,list,pending,acknowledge:serialized(acknowledge),failed:serialized(failed),persist,estimate,uuid:uid};
+ return {supported,has,owners,create,unlock,lock,activeOwner,getState,setState:serialized(setState),exportBackup:serialized(exportBackup),importBackup:serialized(importBackup),stage:serialized(stage),stageBatch:serialized(stageBatch),stagePhoto:serialized(stagePhoto),cachePhoto:serialized(cachePhoto),snapshot:serialized(snapshot),reconcile:serialized(reconcile),photoMetadata,checkCapacity:capacity,get,getPhoto,list,pending,acknowledge:serialized(acknowledge),failed:serialized(failed),persist,estimate,uuid:uid};
 })();

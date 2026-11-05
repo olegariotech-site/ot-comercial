@@ -4,11 +4,15 @@
  */
 'use strict';
 window.OTFieldSync=(()=>{
- const KIND_ORDER={company:0,visit:1,photo:2};
- const TABLE={company:'ot_empresas',visit:'ot_visitas',photo:'ot_fotos'};
+ const KIND_ORDER={company:0,visit:1,photo:2,commercial:3};
+ const TABLE={company:'ot_empresas',visit:'ot_visitas',photo:'ot_fotos',commercial:'ot_comercial_eventos'};
  const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  function requireUuid(id,label){if(typeof id!=='string'||!UUID.test(id))throw Error(label+' não é UUID válido.');return id}
  function data(kind,row){
+  if(kind==='commercial'){
+   const keys=['id','empresa_id','entity_id','entity_type','parent_id','occurred_at','data'];
+   return Object.fromEntries(keys.map(k=>[k,row[k]??null]));
+  }
   if(kind==='company'){
    const keys=['id','nome','segmento','bairro','cidade','endereco','responsavel','whatsapp','presenca_digital','briefing','observacoes','status','retorno_em'];
    const out={};for(const k of keys)if(row[k]!==undefined)out[k]=row[k];
@@ -27,6 +31,10 @@ window.OTFieldSync=(()=>{
   throw Error('Tipo inválido');
  }
  function matches(kind,remote,local){
+  if(kind==='commercial'){
+   const stable=x=>x&&typeof x==='object'?(Array.isArray(x)?x.map(stable):Object.fromEntries(Object.keys(x).sort().map(k=>[k,stable(x[k])]))):x;
+   const a=data(kind,remote),b=data(kind,local);a.occurred_at=Date.parse(a.occurred_at);b.occurred_at=Date.parse(b.occurred_at);return JSON.stringify(stable(a))===JSON.stringify(stable(b));
+  }
   const keys=kind==='company'?['id','nome','segmento','bairro','cidade','endereco','responsavel','whatsapp','presenca_digital','briefing','observacoes','status','retorno_em']:
    kind==='visit'?['id','empresa_id','nota','proximo_passo','retorno_em']:
    ['id','empresa_id','storage_path','arquivo_nome','categoria','descricao','bytes','publicacao_autorizada'];
@@ -48,7 +56,15 @@ window.OTFieldSync=(()=>{
   if(api.owner!==owner)throw Error('Sessão de outro usuário. Nenhum dado foi enviado.');
   const unchanged=()=>{if(vault.activeOwner()!==owner||api.owner!==owner)throw Error('Sessão alterada durante sincronização');};
   const ops=await vault.pending();
-  const sorted=ops.slice().sort((a,b)=>(KIND_ORDER[a.kind]??99)-(KIND_ORDER[b.kind]??99)||a.createdAt-b.createdAt);
+  let sorted=ops.slice().sort((a,b)=>(KIND_ORDER[a.kind]??99)-(KIND_ORDER[b.kind]??99)||a.createdAt-b.createdAt);
+  // Eventos pais antes de suas versões seguintes, independente de timestamps.
+  const remaining=sorted.filter(x=>x.kind==='commercial'),ordered=sorted.filter(x=>x.kind!=='commercial');
+  while(remaining.length){
+   const index=remaining.findIndex(x=>{const r=x.payload.record;return (!r?.parent_id||!remaining.some(p=>p.payload.id===r.parent_id))&&(!r?.data?.oportunidade_id||!remaining.some(p=>p.payload.record?.entity_type==='opportunity'&&p.payload.record?.entity_id===r.data.oportunidade_id&&!p.payload.record?.parent_id))});
+   if(index<0)throw Error('Dependência comercial cíclica; fila preservada');
+   ordered.push(...remaining.splice(index,1));
+  }
+  sorted=ordered;
   const result={total:sorted.length,synced:0,failed:0,pending:sorted.length,errors:[]};
   for(const task of sorted){
    try{
