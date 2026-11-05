@@ -9,6 +9,7 @@ const tokenStorageKey = 'ot_comercial_v12_sessao';
 let session = null, userId = null, companies = [], active = null, photos = [], objectUrls = [];
 let offlineMode=false, syncBusy=false, lastSyncIssue='';
 let refreshInFlight=null, galleryBusy=false;
+let galleryRevision=0,visitRevision=0;
 const offlineOwnerKey='ot_comercial_offline_owner_v1';
 function fieldReady(){return !!(userId&&window.OTOfflineVault?.activeOwner()===userId);}
 function rememberedOwner(){try{return localStorage.getItem(offlineOwnerKey)||'';}catch{return '';}}
@@ -319,6 +320,7 @@ async function openCompany(id){active=companies.find(c=>c.id===id);if(!active)re
  $('visitForm').reset();$('photoConsent').checked=false;$('photoCacheState').textContent='Use Preparar fotos offline para confirmar toda a galeria.';
  await Promise.all([loadVisits(id),loadPhotos(id)]);$('companyPanel').scrollIntoView({behavior:'smooth',block:'start'});}
 async function loadVisits(id){
+ const revision=++visitRevision,owner=userId;
  let remote=[];
  if(!offlineMode&&navigator.onLine!==false){
   try{
@@ -339,6 +341,7 @@ async function loadVisits(id){
  for(const visit of local)if(!merged.has(visit.id))merged.set(visit.id,visit);
  const pending=new Set(fieldReady()?(await OTOfflineVault.pending()).filter(x=>x.kind==='visit').map(x=>x.payload.id):[]);
  const list=[...merged.values()].sort((a,b)=>String(b.realizado_em||'').localeCompare(String(a.realizado_em||'')));
+ if(active?.id!==id||owner!==userId||revision!==visitRevision)return;
  $('visitList').innerHTML=list.map(v=>'<article><small>'+
   esc(v.realizado_em?new Date(v.realizado_em).toLocaleString('pt-BR'):'Sem data')+
   (pending.has(v.id)?' · Salvo no aparelho':'')+'</small><p class="note-text">'+esc(v.nota)+
@@ -373,6 +376,7 @@ async function saveVisit(ev){ev.preventDefault();if(!active)return;
  finally{btn.disabled=false;}
 }
 async function loadPhotos(id){
+ const revision=++galleryRevision,owner=userId;
  destroyObjectUrls();let cloud=[],cloudLoaded=false;
  if(!offlineMode&&navigator.onLine!==false){
   try{
@@ -390,12 +394,13 @@ async function loadPhotos(id){
  }
  const local=fieldReady()?(await OTOfflineVault.list('photo')).filter(x=>x.empresa_id===id):[];
  const pending=new Set(fieldReady()?(await OTOfflineVault.pending()).filter(x=>x.kind==='photo').map(x=>x.payload.id):[]);
+ if(active?.id!==id||owner!==userId||revision!==galleryRevision)return;
  const merged=new Map(cloud.map(p=>[p.id,{...p,__pending:pending.has(p.id)}]));
  for(const p of local)if(!merged.has(p.id)&&(!cloudLoaded||pending.has(p.id)))
   merged.set(p.id,{...p,__pending:pending.has(p.id)});
  photos=[...merged.values()];renderPhotoCards();
  for(const p of photos){
-  if(active?.id!==id)break;
+  if(active?.id!==id||owner!==userId||revision!==galleryRevision)break;
   let blob=null,stored=false;
   try{
    // A imagem pertence ao cofre tanto ANTES quanto DEPOIS do upload.
@@ -421,6 +426,7 @@ async function loadPhotos(id){
      }
     }
    }
+   if(active?.id!==id||owner!==userId||revision!==galleryRevision)break;
    const label=document.getElementById('photo-offline-'+p.id);
    if(label)label.textContent=stored?' · DISPONÍVEL OFFLINE':' · OFFLINE NÃO CONFIRMADO';
    if(!blob)continue;
@@ -475,7 +481,8 @@ async function preparePhotoGalleryOffline(){
    }catch(e){failures.push('Foto '+(index+1)+': '+safeErr(e));}
    output.textContent=ready+' de '+cloud.length+' fotos confirmadas no cofre...';
   }
-  if(active?.id===companyId)await loadPhotos(companyId);
+  if(active?.id!==companyId||owner!==userId)throw Error('Empresa ou conta alterada durante a preparação');
+  await loadPhotos(companyId);
   if(failures.length){
    output.textContent=ready+' de '+cloud.length+' fotos offline. Falhou: '+failures.join(' | ');
    toast('Galeria offline incompleta: '+ready+'/'+cloud.length+'. Confira o motivo na seção da galeria.');
@@ -500,23 +507,24 @@ function renderPhotoCards(){
   '</div></div></article>').join('')||
   '<div class="empty">Ainda não há fotos. Use a câmera ou selecione imagens.</div>';
 }
-async function uploadPhotos(fileList){if(!active||!fileList.length)return;const allowed={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};const selected=[...fileList];let done=0,staged=0;
- for(const file of selected){try{if(!allowed[file.type])throw Error(`Formato não aceito (${file.name}). Use JPG, PNG ou WebP.`);if(file.size>6*1024*1024)throw Error(`Foto acima de 6 MB: ${file.name}`);if(photos.length+done>=12)throw Error('Limite inicial de 12 fotos por empresa.');
+async function uploadPhotos(fileList){if(!active||!fileList.length)return;const allowed={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};const selected=[...fileList],companyId=active.id,owner=userId,category=$('photoCategory').value,consent=$('photoConsent').checked;let done=0,staged=0;
+ for(const file of selected){try{if(active?.id!==companyId||userId!==owner)throw Error('Empresa ou conta alterada; selecione novamente as fotos restantes.');if(!allowed[file.type])throw Error(`Formato não aceito (${file.name}). Use JPG, PNG ou WebP.`);if(file.size>6*1024*1024)throw Error(`Foto acima de 6 MB: ${file.name}`);if(photos.length+done>=12)throw Error('Limite inicial de 12 fotos por empresa.');
  if(fieldReady()){
-  await OTOfflineVault.stagePhoto({id:crypto.randomUUID(),empresa_id:active.id,
-   arquivo_nome:safeFile(file.name),categoria:$('photoCategory').value,
-   descricao:'',publicacao_autorizada:$('photoConsent').checked},file);
+  await OTOfflineVault.stagePhoto({id:crypto.randomUUID(),empresa_id:companyId,
+   arquivo_nome:safeFile(file.name),categoria:category,
+   descricao:'',publicacao_autorizada:consent},file);
   done++;staged++;toast('Foto '+done+' criptografada no aparelho; aguardando nuvem.');
   continue;
  }
  if(offlineMode||navigator.onLine===false)throw Error('Desbloqueie o cofre antes de fotografar sem internet.');
- const photoId=crypto.randomUUID(),path=`${userId}/${active.id}/${photoId}.${allowed[file.type]}`;
- await authenticated();const upload=await raw(`${base}/storage/v1/object/${bucket}/${encodePath(path)}`,{method:'POST',headers:{...headers(true),'Content-Type':file.type,'x-upsert':'false'},body:file});
+ const photoId=crypto.randomUUID(),path=`${owner}/${companyId}/${photoId}.${allowed[file.type]}`;
+ await authenticated();if(userId!==owner||active?.id!==companyId)throw Error('Empresa ou conta alterada');const upload=await raw(`${base}/storage/v1/object/${bucket}/${encodePath(path)}`,{method:'POST',headers:{...headers(true),'Content-Type':file.type,'x-upsert':'false'},body:file});
  if(!upload.ok)throw Error('Falha no envio da foto.');
- try{await request('ot_fotos',{method:'POST',body:{id:photoId,empresa_id:active.id,storage_path:path,arquivo_nome:safeFile(file.name),categoria:$('photoCategory').value,bytes:file.size,publicacao_autorizada:$('photoConsent').checked}});}catch(e){throw Error('Envio sem confirmação. Confira a galeria antes de repetir.');}
+ if(userId!==owner)throw Error('Conta alterada; envio não confirmado');
+ try{await request('ot_fotos',{method:'POST',body:{id:photoId,empresa_id:companyId,storage_path:path,arquivo_nome:safeFile(file.name),categoria:category,bytes:file.size,publicacao_autorizada:consent}});}catch(e){throw Error('Envio sem confirmação. Confira a galeria antes de repetir.');}
  done++;toast(`Foto ${done} de ${selected.length} salva na nuvem.`);
  }catch(e){toast('Foto não salva: '+safeErr(e));}}
- $('photoCamera').value='';$('photoFiles').value='';try{await loadPhotos(active.id);await updateFieldState();if(staged&&!offlineMode&&navigator.onLine!==false){await syncNow();await loadPhotos(active.id);}}catch(e){toast('Galeria ou sincronização pendente: '+safeErr(e));}}
+ $('photoCamera').value='';$('photoFiles').value='';try{if(active?.id===companyId&&userId===owner)await loadPhotos(companyId);await updateFieldState();if(staged&&!offlineMode&&navigator.onLine!==false){await syncNow();if(active?.id===companyId&&userId===owner)await loadPhotos(companyId);}}catch(e){toast('Galeria ou sincronização pendente: '+safeErr(e));}}
 async function downloadPhoto(id){
  const p=photos.find(x=>x.id===id);if(!p)return;
  try{

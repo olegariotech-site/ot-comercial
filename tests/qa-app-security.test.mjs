@@ -62,3 +62,24 @@ test('Paginação respeita limite menor do servidor e recusa contagem variável'
  page=0;h.scope.requestMock=async()=>({rows:[{id:++page}],total:page===1?3:4});h.run('request=requestMock');
  await assert.rejects(h.run('cloudRows("ot_empresas")'),/Lista remota alterada/);
 });
+
+test('Resposta atrasada de galeria não substitui empresa que acabou de ser aberta',async()=>{
+ const h=harness(),a='22222222-2222-4222-8222-222222222222',b='33333333-3333-4333-8333-333333333333';
+ h.scope.requestMock=async()=>[{id:'44444444-4444-4444-8444-444444444444',empresa_id:a}];
+ h.run('userId='+JSON.stringify(owner)+';active={id:'+JSON.stringify(b)+'};photos=[{id:"sentinela"}];cloudRows=requestMock;');
+ await h.run('loadPhotos('+JSON.stringify(a)+')');
+ assert.equal(h.run('photos[0].id'),'sentinela');
+});
+test('Troca de empresa durante lote de fotos não associa arquivo seguinte a outra empresa',async()=>{
+ const h=harness(),a='22222222-2222-4222-8222-222222222222',b='33333333-3333-4333-8333-333333333333',written=[];
+ const vault={activeOwner:()=>owner,pending:async()=>[],list:async()=>[],
+  stagePhoto:async(info)=>{written.push(info.empresa_id);h.run('active={id:'+JSON.stringify(b)+'}')}
+ };
+ h.scope.window.OTOfflineVault=vault;h.scope.OTOfflineVault=vault;
+ h.control('photoCategory').value='Fachada';h.control('photoConsent').checked=false;
+ h.scope.navigator.onLine=false;h.scope.crypto={randomUUID:()=> '44444444-4444-4444-8444-444444444444'};
+ h.scope.files=[new Blob(['a'],{type:'image/png'}),new Blob(['b'],{type:'image/png'})];
+ h.run('userId='+JSON.stringify(owner)+';active={id:'+JSON.stringify(a)+'};');
+ await h.run('uploadPhotos(files)');
+ assert.deepEqual(written,[a]);
+});

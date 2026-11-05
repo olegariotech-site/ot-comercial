@@ -28,6 +28,7 @@ Data: 05/11/2026. Missão: [Issue #8](https://github.com/olegariotech-site/ot-co
 | Duas chamadas podiam renovar a mesma sessão simultaneamente | Renovação compartilhada por Promise; resposta de sessão anterior não pode substituir login/logout atual | Teste paralelo e troca de sessão em voo |
 | Uma leitura assíncrona podia terminar depois de bloquear/trocar cofre | Revalidar referência do cofre antes de devolver dados; verificar owner antes de reconhecer sincronização | Teste lock durante leitura e troca de conta durante GET; fila preservada |
 | Sincronização era protegida só na aba atual | Web Locks por projeto/owner para sincronização; escritas do cofre serializadas por namespace/owner; toques repetidos no preparo bloqueados | Trava exige navegador compatível; stress de duas abas com rede real continua pendente |
+| Troca de empresa durante resposta/lote podia renderizar galeria anterior ou vincular a próxima foto à nova ficha | Capturar owner/empresa/consentimento no início do lote, interromper lote após troca e ignorar respostas obsoletas por revisão da consulta | Dois testes falharam antes da correção e passaram depois; associação preservada |
 | Mensagens de erro poderiam reproduzir paths/URLs/chaves retornados por serviço | Redação de credenciais, JWT, URL e UUID/path antes da apresentação, tamanho limitado | Teste de sanitização; nenhum segredo inserido em código/relatório |
 
 O preparo informa quantidade efetivamente relida do cofre, valida a associação da foto e só baixa ausentes/inválidas. Não usa `stagePhoto`, não cria pendências nem modifica a nuvem. Repetir o preparo com cópias válidas não transfere as imagens de novo. Galerias de **1, 3 e 12** fotos estão cobertas por testes de lógica/cofre; o cenário completo do navegador usa 3 imagens PNG sintéticas decodificáveis e downloads conferidos byte a byte.
@@ -80,7 +81,7 @@ Sem infraestrutura nova ou dependência paga. Foram usados workflows existentes 
 
 | Gate | Estado | Evidência e alcance |
 | --- | --- | --- |
-| Premium / integração / sync / photo-storage / history / prepare-gallery | PASS local | **51 testes** no snapshot que acompanha este relatório; CI final no comentário do PR |
+| Premium / integração / sync / photo-storage / history / prepare-gallery | PASS local | **53 testes** no snapshot que acompanha este relatório; CI final no comentário do PR |
 | WebCrypto/cofre | PASS local e CI inicial | Cifragem real, senha errada, adulteração, quota, 12 fotos, pendências preservadas |
 | IndexedDB real / reabertura / atomicidade de falha | PASS CI inicial | Chromium Linux, dois processos e abort de gravação de blob por quota |
 | E2E offline completo e reconexão | PASS CI inicial, 3/3 execuções | Empresa/visita/foto, fechar/reabrir, login/sync sem duplicar, 3 imagens reais, 3 downloads exatos, 0 HTTP offline, 0 pendências |
