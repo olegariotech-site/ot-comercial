@@ -52,3 +52,28 @@
 - A conta de testes pode ser criada no painel Supabase Auth > Users. **Não colar senha nesta conversa ou no GitHub**.
 - A sintaxe do script é verificada pela CI; a execução real aguarda usuário de teste e validação do ambiente.
 - **Ainda não existe URL pública de preview para Android.** Não utilizar o CRM produtivo para testes offline.
+
+
+## Gate E — isolamento GitHub Pages comprovado (05/11/2026)
+
+**Risco crítico corrigido:** repositórios distintos do GitHub Pages com mesmo domínio `olegariotech-site.github.io` compartilham a origem do navegador. Por isso o pacote de homologação diferencia obrigatoriamente:
+- `sessionStorage`: `ot_comercial_QA_v15_sessao` (não usa chave da V1.2).
+- `localStorage`: `ot_comercial_QA_offline_owner_v15`.
+- `IndexedDB`: `ot-comercial-QA-encrypted-vault-v15`.
+- Cache Storage: `ot-comercial-QA-shell-...`, sem excluir o cache de versões produtivas.
+- Nome do PWA: `OT Comercial — HOMOLOGAÇÃO`; HTML com aviso claro de dados fictícios e `noindex,nofollow`.
+- Todas as operações do aplicativo apontam **somente** ao Supabase de testes `efscgxwvaixwqhffwdqu`.
+
+O script `build-preview.mjs` aplica a separação apenas nos arquivos do artefato, **sem alterar o código da produção**. O teste `verify-preview-isolation.mjs` falha caso seja reutilizada qualquer chave de armazenamento/URL de produção.
+
+**Evidência:** [GitHub Actions #42031345316](https://github.com/olegariotech-site/ot-comercial/actions/runs/42031345316). Os três jobs `staging-preview`, `qa-premium` e `field-e2e` terminaram com sucesso; o arquivo `ot-v15-preview-staging-nao-publicado` foi gerado e validado.
+
+### Publicação isolada pendente
+- Criar **um repositório público novo** `olegariotech-site/ot-comercial-homologacao` em https://github.com/new; a conexão GitHub atual permite modificar arquivos de repositórios existentes, mas **não permite criar um novo repositório nem configurar GitHub Pages**.
+- No repositório novo, configurar Pages → Build and deployment → GitHub Actions.
+- O workflow de homologação deve obter somente `olegariotech-site/ot-comercial` na branch `feat/v1-5-integracao-premium-offline`, executar `node tests/staging/build-preview.mjs` e `node tests/staging/verify-preview-isolation.mjs` e implantar **apenas** `artifacts/staging-preview/` pelo Actions Pages.
+- Não executar `deploy-pages` no repositório atual `ot-comercial`: isso **substituiria a página do CRM V1.2**.
+- **Não afirmar endereço GitHub Pages disponível até a publicação estar confirmada.**
+- Após staging online: confirmar contas Auth (atualmente apenas uma pendente), testar cliente/visita/foto reais fictícios no Supabase de homologação, depois Android/iOS físico.
+- Somente então decidir sobre atualização da produção, com autorização expressa.
+
