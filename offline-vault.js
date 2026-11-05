@@ -339,7 +339,8 @@ window.OTOfflineVault=(()=>{
   if(!data||data.format!=='OT-VAULT-BACKUP-1'||data.owner!==owner)throw Error('Backup pertence a outra conta ou formato inválido');
   if(typeof passphrase!=='string'||passphrase.length<12||data.meta?.iterations!==310000)throw Error('Senha ou parâmetros de backup inválidos');
   for(const name of ['records','queue','blobs'])if(!Array.isArray(data[name])||data[name].length>20000)throw Error('Backup acima do limite de registros');
-  const backupKey=await derive(passphrase,bytes64(data.meta.salt));
+  const salt=bytes64(data.meta.salt);if(salt.length!==16)throw Error('Salt de backup inválido');
+  const backupKey=await derive(passphrase,salt);
   const proof=await unseal(unpackBox(data.meta.verifier),backupKey,'proof:'+owner);
   if(td.decode(proof)!=='OT-VAULT-OK-v1:'+owner)throw Error('Senha incorreta ou backup danificado');
   const existing={records:new Map((await readAll('records')).map(r=>[r.key,r])),queue:new Map((await readAll('queue')).map(r=>[r.key,r])),blobs:new Map((await readAll('blobs')).map(r=>[r.key,r]))};
@@ -347,10 +348,11 @@ window.OTOfflineVault=(()=>{
   for(const name of ['records','queue','blobs'])for(const row of data[name]){
    if(row.owner!==owner||typeof row.key!=='string'||ids.has(name+':'+row.key))throw Error('Associação ou duplicidade inválida no backup');ids.add(name+':'+row.key);
    const prefix=name==='records'?'record:':name==='queue'?'queue:':'photo:';
-   const raw=await unseal(unpackBox(row.box),backupKey,prefix+row.key);estimated+=raw.byteLength;
+   const raw=await unseal(unpackBox(row.box),backupKey,prefix+row.key);
    if(name==='records'){
     validateKind(row.kind);const value=decode(raw);idValue(value.id);if(row.key!==recordKey(owner,row.kind,value.id))throw Error('Registro de backup inválido');
     if(row.kind==='commercial')window.OTCommercial.event(value,owner);
+    if(row.kind==='photo'&&(!['image/jpeg','image/png','image/webp'].includes(value.mime)||!Number.isSafeInteger(value.bytes)||value.bytes<1||value.bytes>6*1024*1024))throw Error('Formato/tamanho de foto de backup inválido');
    }else if(name==='queue'){
     const value=decode(raw);validateKind(value.kind);idValue(value.id);idValue(row.opId);
     if(value.opId!==row.opId||row.kind!==value.kind||row.key!==queueKey(owner,row.opId)||value.action!=='upsert')throw Error('Fila de backup inválida');
@@ -358,7 +360,7 @@ window.OTOfflineVault=(()=>{
    }else{const id=row.key.slice((owner+':blob:').length);idValue(id);if(row.key!==blobKey(owner,id)||!data.records.some(r=>r.key===recordKey(owner,'photo',id)))throw Error('Foto sem registro no backup')}
    const current=existing[name].get(row.key);
    if(current){const currentBytes=await unseal(current.box,vault.key,prefix+row.key);if(b64(currentBytes)!==b64(raw))throw Error('Conflito de restauração: registros atuais preservados. Use um aparelho de recuperação vazio para este backup.');continue;}
-   const box=await seal(raw,vault.key,prefix+row.key);prepared[name].push({...row,box});
+   estimated+=raw.byteLength;const box=await seal(raw,vault.key,prefix+row.key);prepared[name].push({...row,box});
   }
   await capacity(estimated);unchanged(vault);
   await operation(['records','queue','blobs'],'readwrite',tx=>{for(const name of ['records','queue','blobs'])for(const row of prepared[name])tx.objectStore(name).add(row)});

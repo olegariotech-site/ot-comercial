@@ -51,6 +51,9 @@ const html=[
 '  let quotaFailed=false;try{await v.cachePhoto({id:failedId,empresa_id:company,storage_path:owner+"/"+company+"/"+failedId+".png",bytes:8},new Blob([new Uint8Array([137,80,78,71,13,10,26,10])],{type:"image/png"}))}catch{quotaFailed=true}finally{IDBObjectStore.prototype.put=put}',
 '  check(quotaFailed,"Quota não falhou");check(await v.get("photo",failedId)===null,"Gravação parcial depois de quota");',
 '  check((await v.pending()).length===3,"Quota afetou pendências anteriores");',
+'  const backup=await v.exportBackup();check(!JSON.stringify(backup).includes("Comércio Teste Off"),"Backup em claro");',
+'  localStorage.setItem("ot_qa_encrypted_backup",JSON.stringify(backup));',
+
 
 ' }else if(stage==="reopen"){',
 '  check(await v.has(owner),"Cofre desapareceu depois de fechar o navegador");',
@@ -64,6 +67,15 @@ const html=[
 '  check(p.blob.size===8,"Foto foi perdida");',
 '  check((await v.getPhoto(remotePhoto)).blob.size===8,"Foto remota cifrada não sobreviveu ao reinício");',
 '  check((await v.pending()).length===3,"Fila não persistiu");',
+'  const source=await (await fetch("../../offline-vault.js")).text(),destination={indexedDB,crypto};',
+'  new Function("window",source.replace("ot-comercial-encrypted-vault-v1","ot-qa-recovery-isolated"))(destination);',
+'  const recovered=destination.OTOfflineVault;await recovered.create(owner,"Nova_Senha_Recuperacao_2026!");',
+'  await recovered.importBackup(JSON.parse(localStorage.getItem("ot_qa_encrypted_backup")),pass);',
+'  check((await recovered.pending()).length===3,"Fila não recuperou em outro cofre");',
+'  check((await recovered.getPhoto(remotePhoto)).blob.size===8,"Foto remota não recuperou");',
+'  recovered.lock();await recovered.unlock(owner,"Nova_Senha_Recuperacao_2026!");',
+'  check((await recovered.get("company",company)).nome==="Comércio Teste Off","Novo salt não persistiu restauração");',
+
 '  const raw=await new Promise((resolve,reject)=>{',
 '   const o=indexedDB.open("ot-comercial-encrypted-vault-v1");o.onerror=()=>reject(o.error);',
 '   o.onsuccess=()=>{const r=o.result.transaction("records").objectStore("records").get(owner+":company:"+company);',
