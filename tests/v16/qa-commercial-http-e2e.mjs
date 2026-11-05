@@ -137,6 +137,12 @@ async function loginUI(){await browser.until(shown('loginView'),'login V1.6');aw
 async function unlockOnline(){await browser.evalJS('document.querySelector("#prepareFieldBtn").click();true');await browser.until('document.querySelector("#vaultDialog").open','cofre V1.6');await browser.evalJS('(()=>{document.querySelector("#vaultPassword").value='+JSON.stringify(PWD)+';document.querySelector("#vaultForm button[type=submit]").click();return true})()');await browser.until('document.querySelector("#fieldState").textContent.includes("desbloqueado")','cofre disponível');}
 async function form(id,values){await browser.evalJS('(()=>{const f=document.querySelector('+JSON.stringify('#'+id)+');for(const [k,v] of Object.entries('+JSON.stringify(values)+'))f.elements.namedItem(k).value=v;f.querySelector("button[type=submit]").click();return true})()');}
 async function idle(dialog){await browser.until('!document.querySelector('+JSON.stringify('#'+dialog)+').open','formulário concluído');await browser.until('document.querySelector("#pendingCount").textContent==="0 pendentes"','fila confirmada');}
+async function openCompanyUI(id){
+ await browser.evalJS('document.querySelector("#walletTab").click();true');
+ await browser.until('!!document.querySelector(\'[data-id="'+id+'"]\')','empresa na carteira');
+ await browser.evalJS('document.querySelector(\'[data-id="'+id+'"]\').click();true');
+ await browser.until(shown('companyPanel'),'ficha aberta');
+}
 const timings=[];const buddy=path.join(tmp,'second-device');
 try{
  browser=await launch();await loginUI();assert.equal(await browser.evalJS('document.querySelector("#walletView").hidden'),true);await unlockOnline();
@@ -148,7 +154,7 @@ try{
  }
  assert.equal(mock.map.ot_empresas.size,10);assert.ok(timings.filter(ms=>ms<=90000).length>=8);assert.equal(await browser.evalJS('document.querySelectorAll("[data-agenda-row]").length'),10);
  const company=[...mock.map.ot_empresas.values()].find(x=>x.nome==='QA V16 0');
- await browser.evalJS('document.querySelector(\'[data-open-company="'+company.id+'"]\').click();true');await browser.until('document.querySelectorAll("[data-edit-opportunity]").length===1','oportunidade da empresa');
+ await openCompanyUI(company.id);await browser.until('document.querySelectorAll("[data-edit-opportunity]").length===1','oportunidade da empresa');
  const opportunityId=await browser.evalJS('document.querySelector("[data-edit-opportunity]").dataset.editOpportunity');
  await browser.evalJS('document.querySelector("[data-edit-opportunity]").click();true');await browser.until('document.querySelector("#opportunityDialog").open','diagnóstico');
  await form('opportunityForm',{estagio:'proposta',origem_clientes:'Indicações',prioridade_cliente:'Serviço prioritário QA',jornada_online:'Contato a melhorar após diagnóstico',presenca_verificada:'Site existente conferido, Google ainda a verificar',case_id:'dudu',implantacao_proposta:'2500,00',mensalidade_proposta:'420,00'});await idle('opportunityDialog');
@@ -168,20 +174,19 @@ try{
  // Apresentação pública independente, sem sessão/cofre/notas nas páginas.
  await browser.send('Page.navigate',{url:mock.origin+'/cases.html?segment=alimentacao'});await browser.until('document.querySelectorAll("#caseCards article").length===2','cases por segmento');assert.equal(await browser.evalJS('document.body.textContent.includes("QA V16")'),false);assert.equal(await browser.evalJS('typeof OTOfflineVault'),'undefined');await browser.screenshot('02-cases-publicos.png');
  await browser.send('Page.navigate',{url:mock.origin+'/index.html'});await browser.until(shown('appView'),'retorno ao CRM');await unlockOnline();
- await browser.evalJS('document.querySelector(\'[data-open-company="'+company.id+'"]\').click();true');await browser.until(shown('companyPanel'),'ficha para fotos');
+ await openCompanyUI(company.id);await browser.until(shown('companyPanel'),'ficha para fotos');
  await browser.evalJS('(()=>{const dt=new DataTransfer();for(let i=1;i<=3;i++)dt.items.add(new File([Uint8Array.from(atob('+JSON.stringify(png.toString('base64'))+'),c=>c.charCodeAt(0))],"qa"+i+".png",{type:"image/png"}));const input=document.querySelector("#photoFiles");input.files=dt.files;input.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
  await browser.until('document.querySelectorAll("#photoList img").length===3&&document.querySelector("#pendingCount").textContent==="0 pendentes"','três fotos sincronizadas',30000);
  await browser.close();browser=null;
  // Segundo perfil: autenticar, criar cofre independente e obter agenda/fotos da nuvem simulada.
  browser=await launch(false,buddy);await loginUI();await unlockOnline();
  assert.equal(await browser.evalJS('(async()=>OTCommercial.metrics(OTCommercial.project(await OTOfflineVault.list("commercial"))).mrr)()'),42000);
- await browser.evalJS('document.querySelector(\'[data-open-company="'+company.id+'"]\').click();true');await browser.until('document.querySelectorAll("#photoList img").length===3&&[...document.querySelectorAll("#photoList img")].every(i=>i.naturalWidth>0)','fotos de outro dispositivo');
+ await openCompanyUI(company.id);await browser.until('document.querySelectorAll("#photoList img").length===3&&[...document.querySelectorAll("#photoList img")].every(i=>i.naturalWidth>0)','fotos de outro dispositivo');
  await browser.evalJS('document.querySelector("#preparePhotoOfflineBtn").click();true');await browser.until('document.querySelector("#photoCacheState").textContent.includes("3 de 3 fotos disponíveis offline")','preparo no segundo dispositivo');
  await browser.close();browser=null;const beforeOffline=mock.apiRequests.length;
  browser=await launch(true,buddy);await browser.until(shown('offlineLoginView'),'abrir offline no outro dispositivo');
- await form('offlineUnlockForm',{}).catch(()=>{}); // sem senha não abre; preencher corretamente abaixo.
  await browser.evalJS('(()=>{document.querySelector("#offlinePassword").value='+JSON.stringify(PWD)+';document.querySelector("#offlineUnlockForm button[type=submit]").click();return true})()');await browser.until(shown('appView'),'desbloquear offline');await browser.until('!document.querySelector("#agendaView").hidden&&document.querySelectorAll("[data-agenda-row]").length>0','agenda offline');
- await browser.evalJS('document.querySelector(\'[data-open-company="'+company.id+'"]\').click();true');await browser.until('document.querySelectorAll("#photoList img").length===3&&[...document.querySelectorAll("#photoList img")].every(i=>i.naturalWidth>0)','3/3 imagens reais offline');
+ await openCompanyUI(company.id);await browser.until('document.querySelectorAll("#photoList img").length===3&&[...document.querySelectorAll("#photoList img")].every(i=>i.naturalWidth>0)','3/3 imagens reais offline');
  const downloads=path.join(tmp,'downloads');fs.mkdirSync(downloads,{recursive:true});await browser.send('Page.setDownloadBehavior',{behavior:'allow',downloadPath:downloads});await browser.evalJS('[...document.querySelectorAll("[data-download]")].forEach(b=>b.click());true');for(let i=0;i<80&&fs.readdirSync(downloads).filter(n=>n.endsWith('.png')).length<3;i++)await wait(100);assert.equal(fs.readdirSync(downloads).filter(n=>n.endsWith('.png')).length,3);for(const file of fs.readdirSync(downloads).filter(n=>n.endsWith('.png')))assert.deepEqual(fs.readFileSync(path.join(downloads,file)),png);
  await browser.screenshot('03-segundo-aparelho-offline.png',true);
  await browser.evalJS('document.querySelector("#quickNewBtn").click();true');await browser.until('document.querySelector("#quickDialog").open','cadastro offline');await form('quickForm',{nome:'QA V16 OFFLINE FINAL',proxima:'Retomar após reconexão',data:day});await browser.until('!document.querySelector("#quickDialog").open&&document.querySelector("#pendingCount").textContent.startsWith("3 pendentes")','lote offline cifrado');

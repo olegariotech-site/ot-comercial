@@ -280,7 +280,11 @@ async function load(){
  if(fieldReady()){
   const pending=await window.OTOfflineVault.pending();
   const pendingIds=new Set(pending.filter(x=>x.kind==='company').map(x=>x.payload.id));
-  for(const local of locals)if(pendingIds.has(local.id)&&!byId.has(local.id))byId.set(local.id,local);
+  for(const task of pending.filter(x=>x.kind!=='company')){
+   const item=await window.OTOfflineVault.get(task.kind,task.payload.id);
+   if(item?.empresa_id)pendingIds.add(item.empresa_id);
+  }
+  for(const local of locals)if(pendingIds.has(local.id)&&!byId.has(local.id))byId.set(local.id,{...local,__remoteMissing:true});
  }
  companies=[...byId.values()];render();await updateFieldState();if(window.OTCommercialUI)await window.OTCommercialUI.refresh();
 }
