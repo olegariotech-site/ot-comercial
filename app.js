@@ -325,29 +325,57 @@ async function saveVisit(ev){ev.preventDefault();if(!active)return;
  finally{btn.disabled=false;}
 }
 async function loadPhotos(id){
- destroyObjectUrls();let cloud=[];
+ destroyObjectUrls();let cloud=[],cloudLoaded=false;
  if(!offlineMode&&navigator.onLine!==false){
-  try{cloud=await request('ot_fotos?select=*&empresa_id=eq.'+encodeURIComponent(id)+'&order=created_at.desc')}
-  catch(e){if(!fieldReady())throw e;toast('Galeria na nuvem indisponível; exibindo fotos locais.');}
+  try{
+   cloud=await request('ot_fotos?select=*&empresa_id=eq.'+encodeURIComponent(id)+'&order=created_at.desc');
+   cloudLoaded=true;
+  }catch(e){
+   if(!fieldReady())throw e;
+   toast('Galeria na nuvem indisponível; exibindo fotos locais.');
+  }
  }
- const staged=fieldReady()?(await OTOfflineVault.list('photo')).filter(x=>x.empresa_id===id):[];
+ const local=fieldReady()?(await OTOfflineVault.list('photo')).filter(x=>x.empresa_id===id):[];
  const pending=new Set(fieldReady()?(await OTOfflineVault.pending()).filter(x=>x.kind==='photo').map(x=>x.payload.id):[]);
- const merged=new Map(cloud.map(p=>[p.id,p]));
- for(const p of staged)if(!merged.has(p.id))merged.set(p.id,{...p,__pending:pending.has(p.id)});
+ const merged=new Map(cloud.map(p=>[p.id,{...p,__pending:pending.has(p.id)}]));
+ for(const p of local)if(!merged.has(p.id)&&(!cloudLoaded||pending.has(p.id)))
+  merged.set(p.id,{...p,__pending:pending.has(p.id)});
  photos=[...merged.values()];renderPhotoCards();
  for(const p of photos){
   if(active?.id!==id)break;
+  let blob=null,stored=false;
   try{
-   let blob;
-   if(p.__pending){const local=await OTOfflineVault.getPhoto(p.id);blob=local?.blob}
-   else if(!offlineMode&&navigator.onLine!==false&&p.storage_path){
+   // A imagem pertence ao cofre tanto ANTES quanto DEPOIS do upload.
+   if(fieldReady()){
+    try{
+     const saved=await OTOfflineVault.getPhoto(p.id);
+     if(saved?.blob?.size){blob=saved.blob;stored=true;}
+    }catch{ /* sem cópia local utilizável; consultar nuvem se disponível */ }
+   }
+   if(!blob&&!offlineMode&&navigator.onLine!==false&&p.storage_path){
     const resp=await request('object/authenticated/'+bucket+'/'+encodePath(p.storage_path),{storage:true});
     blob=await resp.blob();
+    if(fieldReady()){
+     try{
+      const cached=await OTOfflineVault.cachePhoto(p,blob);
+      if(cached.cached){
+       const verified=await OTOfflineVault.getPhoto(p.id);
+       stored=verified?.blob?.size===blob.size;
+      }
+     }catch(e){
+      toast('Foto acessível online, mas cópia offline não confirmada: '+safeErr(e));
+     }
+    }
    }
+   const label=document.getElementById('photo-offline-'+p.id);
+   if(label)label.textContent=stored?' · DISPONÍVEL OFFLINE':' · OFFLINE NÃO CONFIRMADO';
    if(!blob)continue;
    const url=URL.createObjectURL(blob);objectUrls.push(url);
    const im=document.getElementById('img-'+p.id);if(im)im.src=url;
-  }catch{ /* erro de foto isolado, mantendo galeria privada */ }
+  }catch{
+   const label=document.getElementById('photo-offline-'+p.id);
+   if(label)label.textContent=' · FOTO INDISPONÍVEL';
+  }
  }
 }
 function renderPhotoCards(){
@@ -355,7 +383,8 @@ function renderPhotoCards(){
   esc(p.id)+'" alt="'+esc(p.categoria)+' — '+esc(p.arquivo_nome)+'" loading="lazy">'+
   '<div class="photo-body"><strong>'+esc(p.arquivo_nome)+'</strong><p>'+
   esc(p.categoria)+(p.__pending?' · SALVA NO APARELHO':p.publicacao_autorizada?
-  ' · uso autorizado':' · uso não autorizado')+'</p><div class="photo-actions">'+
+  ' · uso autorizado':' · uso não autorizado')+
+  '<small id="photo-offline-'+esc(p.id)+'"></small></p><div class="photo-actions">'+
   '<button class="btn secondary" data-download="'+esc(p.id)+'">↓ Baixar</button>'+
   (p.__pending?'':'<button class="btn danger" data-delete-photo="'+esc(p.id)+'">Excluir</button>')+
   '</div></div></article>').join('')||
@@ -381,12 +410,14 @@ async function uploadPhotos(fileList){if(!active||!fileList.length)return;const 
 async function downloadPhoto(id){
  const p=photos.find(x=>x.id===id);if(!p)return;
  try{
-  let blob;
-  if(p.__pending){
-   if(!fieldReady())throw Error('Desbloqueie o cofre para acessar a fotografia.');
-   blob=(await OTOfflineVault.getPhoto(id))?.blob;
-  }else{
-   if(offlineMode||navigator.onLine===false)throw Error('Esta fotografia não foi guardada no aparelho.');
+  let blob=null;
+  if(fieldReady()){
+   try{blob=(await OTOfflineVault.getPhoto(id))?.blob||null}catch{}
+  }
+  if(!blob){
+   if(p.__pending)throw Error('Foto pendente não encontrada no cofre deste aparelho.');
+   if(offlineMode||navigator.onLine===false)
+    throw Error('Esta fotografia ainda não tem cópia offline neste aparelho.');
    const resp=await request('object/authenticated/'+bucket+'/'+encodePath(p.storage_path),{storage:true});
    blob=await resp.blob();
   }
