@@ -56,7 +56,7 @@ replaceExactly('sw.js',
  "const PREFIX='ot-comercial-QA-shell-';");
 replaceExactly('sw.js',
  "const CACHE=PREFIX+'v1-5-gate-b';",
- "const CACHE=PREFIX+'v1-5-staging-v5';");
+ "const CACHE=PREFIX+'v1-5-staging-v6';");
 replaceExactly('sw.js',
  "(x.startsWith(PREFIX)||x.startsWith('ot-comercial-v13-shell-'))&&x!==CACHE",
  "x.startsWith(PREFIX)&&x!==CACHE");
