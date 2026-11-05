@@ -71,6 +71,8 @@ jobs:
           node-version: '22'
       - name: Preparar preview isolado (sem deploy)
         run: node tests/staging/build-preview.mjs
+      - name: Validar isolamento local entre preview QA e CRM oficial
+        run: node tests/staging/verify-preview-isolation.mjs
       - name: Provar acesso anônimo negado no Supabase real de homologação
         run: node tests/staging/qa-anon-http.mjs
       - name: Arquivar somente arquivos de homologação
