@@ -42,7 +42,7 @@ test('Refresh paralelo compartilha uma só renovação e rejeita resposta de ses
 });
 test('Lista completa exige paginação bem sucedida; falha não autoriza reconcile',async()=>{
  const h=harness();const rows=Array.from({length:500},(_,id)=>({id}));let pages=0;
- h.scope.requestMock=async()=>{pages++;if(pages===1)return rows;throw Error('HTTP 403')};
+ h.scope.requestMock=async()=>{pages++;if(pages===1)return {rows,total:501};throw Error('HTTP 403')};
  h.run('request=requestMock');
  await assert.rejects(h.run('cloudRows("ot_empresas")'),/HTTP 403/);assert.equal(pages,2);
 });
@@ -52,4 +52,13 @@ test('Erro apresentado não expõe JWT, chave, URL nem caminho privado',()=>{
  h.scope.message=message;
  const result=h.run('safeErr(new Error(message))');
  assert.doesNotMatch(result,/token|sb_secret_|https:|11111111/);
+});
+
+
+test('Paginação respeita limite menor do servidor e recusa contagem variável',async()=>{
+ const h=harness();let page=0;
+ h.scope.requestMock=async()=>({rows:[{id:++page}],total:3});h.run('request=requestMock');
+ assert.equal((await h.run('cloudRows("ot_empresas")')).length,3);
+ page=0;h.scope.requestMock=async()=>({rows:[{id:++page}],total:page===1?3:4});h.run('request=requestMock');
+ await assert.rejects(h.run('cloudRows("ot_empresas")'),/Lista remota alterada/);
 });

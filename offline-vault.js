@@ -212,11 +212,11 @@ window.OTOfflineVault=(()=>{
  // intactas; não recria base nem chaves. Descarta apenas cópias já sincronizadas.
  async function reconcile(kind,records,{companyId,complete=false}={}){
   validateKind(kind);
-  if(!complete||!Array.isArray(records)||records.length>5000)throw Error('Liste distante complète obligatoire');
+  if(!complete||!Array.isArray(records)||records.length>5000)throw Error('Lista remota completa obrigatória');
   if(companyId)idValue(companyId);
   const vault=live(),owner=vault.owner,ids=new Set(records.map(r=>idValue(r.id)));
   if(records.some(r=>(r.owner_id&&r.owner_id!==owner)||(companyId&&r.empresa_id!==companyId)))
-   throw Error('Liste distante de compte ou entreprise incorrecte');
+   throw Error('Lista remota de conta ou empresa incorreta');
   const dirty=new Set((await pending()).map(p=>p.kind+':'+p.payload.id));
   const local=await list(kind),removed=local.filter(r=>(!companyId||r.empresa_id===companyId)&&!ids.has(r.id)&&!dirty.has(kind+':'+r.id));
   const targets=[];
@@ -286,5 +286,5 @@ window.OTOfflineVault=(()=>{
  async function persist(){return navigator.storage?.persist?navigator.storage.persist():false}
  async function estimate(){return globalThis.navigator?.storage?.estimate?navigator.storage.estimate():null}
  const serialized=fn=>(...args)=>exclusive(()=>fn(...args));
- return {supported,has,owners,create,unlock,lock,activeOwner,stage:serialized(stage),stagePhoto:serialized(stagePhoto),cachePhoto:serialized(cachePhoto),snapshot:serialized(snapshot),reconcile:serialized(reconcile),photoMetadata,get,getPhoto,list,pending,acknowledge:serialized(acknowledge),failed:serialized(failed),persist,estimate,uuid:uid};
+ return {supported,has,owners,create,unlock,lock,activeOwner,stage:serialized(stage),stagePhoto:serialized(stagePhoto),cachePhoto:serialized(cachePhoto),snapshot:serialized(snapshot),reconcile:serialized(reconcile),photoMetadata,checkCapacity:capacity,get,getPhoto,list,pending,acknowledge:serialized(acknowledge),failed:serialized(failed),persist,estimate,uuid:uid};
 })();

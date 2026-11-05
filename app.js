@@ -45,29 +45,40 @@ async function refreshSession(){
 }
 async function authenticated(){if(!session?.access_token)throw Error('Você precisa entrar novamente.');
  if((session.expires_at||0)-Math.floor(Date.now()/1000)<60)await refreshSession();}
-async function request(path,{method='GET',body,storage=false,retry=true}={}){
+async function request(path,{method='GET',body,storage=false,retry=true,pageInfo=false}={}){
  const owner=userId;
  await authenticated();const url=base+(storage?'/storage/v1/':'/rest/v1/')+path;
  if(userId!==owner)throw Error('Conta alterada durante a operação');
  const hs={...headers(true)};if(body!==undefined&&!storage)hs['Content-Type']='application/json';
  if(!storage&&['POST','PATCH'].includes(method))hs.Prefer='return=representation';
+ if(pageInfo)hs.Prefer='count=exact';
  let res;try{res=await fetch(url,{method,headers:hs,body:body===undefined?undefined:storage?body:JSON.stringify(body)});}catch{throw Error('Sem conexão. Operação não concluída.');}
  if(userId!==owner)throw Error('Conta alterada durante a operação');
- if(res.status===401&&retry){await refreshSession();return request(path,{method,body,storage,retry:false});}
+ if(res.status===401&&retry){await refreshSession();return request(path,{method,body,storage,retry:false,pageInfo});}
  if(!res.ok){let msg=`Falha (${res.status})`;try{const d=await res.json();msg=d.message||d.error||d.msg||msg;}catch{}throw Error(msg);}
  if(storage)return res;
  if(res.status===204||res.headers.get('content-length')==='0')return [];
- const rawtxt=await res.text();return rawtxt?JSON.parse(rawtxt):[];
+ const rawtxt=await res.text(),rows=rawtxt?JSON.parse(rawtxt):[];
+ if(pageInfo){
+  const range=res.headers.get('content-range')||'',match=/\/(\d+)$/.exec(range);
+  if(!match)throw Error('Nuvem não confirmou a contagem completa; cópias locais preservadas');
+  return {rows,total:Number(match[1])};
+ }
+ return rows;
 }
 // Paginação explícita: uma resposta truncada não autoriza descartar cópias locais.
 async function cloudRows(table,filter=''){
- const owner=userId,result=[];
- for(let offset=0;offset<=5000;offset+=500){
-  const page=await request(table+'?select=*&order=id.asc&limit=500&offset='+offset+filter);
-  if(owner!==userId||!Array.isArray(page))throw Error('Consulta incompleta ou conta alterada');
-  result.push(...page);
-  if(result.length>5000)throw Error('Carteira acima do limite de preparo; cópias locais preservadas');
-  if(page.length<500)return result;
+ const owner=userId,result=[],ids=new Set();let expected=null;
+ for(let offset=0;offset<=5000;){
+  const page=await request(table+'?select=*&order=id.asc&limit=500&offset='+offset+filter,{pageInfo:true});
+  if(owner!==userId||!Array.isArray(page.rows)||!Number.isSafeInteger(page.total)||page.total<0)
+   throw Error('Consulta incompleta ou conta alterada');
+  if(expected===null)expected=page.total;
+  if(page.total!==expected||expected>5000)throw Error('Lista remota alterada ou acima do limite; cópias locais preservadas');
+  for(const row of page.rows){if(ids.has(row.id))throw Error('Página repetida; cópias locais preservadas');ids.add(row.id);result.push(row)}
+  offset+=page.rows.length;
+  if(offset===expected)return result.sort((a,b)=>String(b.realizado_em||b.created_at||'').localeCompare(String(a.realizado_em||a.created_at||'')));
+  if(!page.rows.length||offset>expected)throw Error('Lista remota incompleta; cópias locais preservadas');
  }
  throw Error('Não foi possível confirmar a lista completa');
 }
@@ -395,6 +406,7 @@ async function loadPhotos(id){
     }catch{ /* sem cópia local utilizável; consultar nuvem se disponível */ }
    }
    if(!blob&&!offlineMode&&navigator.onLine!==false&&p.storage_path){
+    if(fieldReady())await OTOfflineVault.checkCapacity(Number(p.bytes));
     const resp=await request('object/authenticated/'+bucket+'/'+encodePath(p.storage_path),{storage:true});
     blob=await resp.blob();
     if(fieldReady()){
@@ -450,6 +462,7 @@ async function preparePhotoGalleryOffline(){
     try{saved=await OTOfflineVault.getPhoto(p.id)}catch{}
     if(!saved?.blob?.size||saved.blob.size!==Number(p.bytes)||saved.metadata.empresa_id!==companyId||saved.metadata.storage_path!==p.storage_path){
      if(!p.storage_path)throw Error('Arquivo sem caminho na nuvem');
+     await OTOfflineVault.checkCapacity(Number(p.bytes));
      const resp=await request('object/authenticated/'+bucket+'/'+encodePath(p.storage_path),{storage:true});
      const blob=await resp.blob();
      const result=await OTOfflineVault.cachePhoto(p,blob);

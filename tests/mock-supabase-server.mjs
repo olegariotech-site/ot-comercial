@@ -10,7 +10,7 @@ const TOKEN='QA_TOKEN_NOT_A_REAL_TOKEN';
 const REFRESH='QA_REFRESH_NOT_A_REAL_TOKEN';
 const type={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8',
  '.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
-const json=(res,status,obj)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(obj))};
+const json=(res,status,obj,extra={})=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store',...extra});res.end(JSON.stringify(obj))};
 const fail=(res,status,msg)=>json(res,status,{message:msg});
 const body=async(req,limit=8*1024*1024)=>{let bytes=0;const parts=[];for await(const x of req){bytes+=x.length;if(bytes>limit)throw Error('Exceeds test size limit');parts.push(x)}return Buffer.concat(parts)};
 export function startMockSupabase(root,tls=null){
@@ -44,7 +44,11 @@ export function startMockSupabase(root,tls=null){
    if(pathname.startsWith('/rest/v1/')){
     const table=pathname.split('/')[3];
     if(!map[table])return fail(res,404,'Tabela de teste inexistente');
-    if(req.method==='GET')return json(res,200,rows(table,url.searchParams,map));
+    if(req.method==='GET'){
+     const params=new URLSearchParams(url.searchParams);params.delete('limit');params.delete('offset');
+     const total=rows(table,params,map).length,offset=Number(url.searchParams.get('offset')||0),page=rows(table,url.searchParams,map);
+     return json(res,200,page,{'Content-Range':(page.length?offset+'-'+(offset+page.length-1):'*')+'/'+total});
+    }
     if(req.method==='POST'){
      const val=JSON.parse((await body(req)).toString());
      if(!val.id)return fail(res,400,'UUID explicito obrigatório');

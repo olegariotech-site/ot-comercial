@@ -73,9 +73,10 @@ async function launch(offline=false){
    ws.addEventListener('open',resolve,{once:true});
    ws.addEventListener('error',reject,{once:true});
   });
-  let serial=0;const pending=new Map();
+  let serial=0;const pending=new Map(),exceptions=[];
   ws.addEventListener('message',evt=>{
    let x;try{x=JSON.parse(evt.data)}catch{return}
+   if(x.method==='Runtime.exceptionThrown')exceptions.push(x.params?.exceptionDetails?.text||'JS exception');
    if(!x.id)return;
    const p=pending.get(x.id);if(!p)return;pending.delete(x.id);
    if(x.error)p.reject(Error(x.error.message));else p.resolve(x.result||{});
@@ -109,8 +110,10 @@ async function launch(offline=false){
    }
    throw Error('Gate D não passou ['+label+']; último estado: '+JSON.stringify(last));
   }
-  async function screenshot(file){
-   const r=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+  async function screenshot(file,full=false){
+   const options={format:'png',captureBeyondViewport:full};
+   if(full){const m=await send('Page.getLayoutMetrics');const box=m.cssContentSize||m.contentSize;options.clip={x:0,y:0,width:box.width,height:box.height,scale:1};}
+   const r=await send('Page.captureScreenshot',options);
    const bytes=Buffer.from(r.data,'base64');
    assert.ok(bytes.length>5000,'Captura vazia: '+file);
    fs.writeFileSync(path.join(out,file),bytes);
@@ -124,7 +127,7 @@ async function launch(offline=false){
    ]);
    await wait(850);
   }
-  return {proc,send,evalJS,until,screenshot,close};
+  return {proc,send,evalJS,until,screenshot,close,exceptions};
  };
  try{return await ready()}
  catch(e){proc.kill('SIGTERM');if(ws?.readyState===WebSocket.OPEN)ws.close();throw e}
@@ -241,7 +244,9 @@ try{
  for(const file of files)assert.deepEqual(fs.readFileSync(path.join(downloads,file)),png,'Download offline com bytes divergentes');
  assert.equal(await browser.evalJS('document.querySelector("#pendingCount").textContent'),'0 pendentes');
  assert.equal(mock.apiRequests.length,networkBefore,'Galeria offline iniciou uma chamada HTTP');
- await browser.screenshot('04-tres-fotos-offline.png');
+ assert.equal(await browser.evalJS('document.title.includes("OT Comercial")&&!!document.querySelector("#photoList img")'),true,'Identidade da página');
+ assert.deepEqual(browser.exceptions,[],'Exceções JS inesperadas');
+ await browser.screenshot('04-tres-fotos-offline.png',true);
  console.log('Gate D: 3 imagens decodificadas, 3 downloads exatos após reiniciar offline, 0 chamadas HTTP, 0 pendências.');
  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({result:'PASS',environment:'Chromium Linux HTTPS mock',physical:false,photosOffline:3,downloadsOffline:3,httpOffline:0,pending:0},null,2));
 
